@@ -6,7 +6,8 @@ use std::{
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
-    }, time::Duration,
+    },
+    time::Duration,
 };
 
 use async_stream::try_stream;
@@ -24,8 +25,8 @@ use tokio_stream::Stream;
 use crate::{
     environment::RemoteEnvironmentConfig,
     service::{RemoteMDBXClient, ServerError},
-    CommitLatency, DatabaseFlags, EnvironmentBuilder, Stat, TableObject,
-    TransactionKind, WriteFlags, RO, RW,
+    CommitLatency, DatabaseFlags, EnvironmentBuilder, Stat, TableObject, TransactionKind,
+    WriteFlags, RO, RW,
 };
 
 macro_rules! mdbx_try_optional {
@@ -121,7 +122,7 @@ impl RemoteEnvironmentInner {
         builder: EnvironmentBuilder,
         client: RemoteMDBXClient,
         dispatcher: D,
-        deadline: Duration
+        deadline: Duration,
     ) -> Result<Self>
     where
         D: Future<Output = std::result::Result<(), E>> + Send + 'static,
@@ -141,7 +142,9 @@ impl RemoteEnvironmentInner {
             tracing::debug!("Dispatcher dies");
         });
         let remote = RemoteEnvironmentConfig::from(builder);
-        let handle = client.open_env(context_deadline(deadline), path, remote).await??;
+        let handle = client
+            .open_env(context_deadline(deadline), path, remote)
+            .await??;
         Ok(Self {
             handle: handle,
             cl: client,
@@ -179,7 +182,7 @@ impl RemoteEnvironment {
         path: PathBuf,
         builder: EnvironmentBuilder,
         client: NewClient<RemoteMDBXClient, D>,
-        deadline: Duration
+        deadline: Duration,
     ) -> Result<Self>
     where
         D: Future<Output = std::result::Result<(), E>> + Send + 'static,
@@ -187,7 +190,14 @@ impl RemoteEnvironment {
     {
         Ok(Self {
             inner: Arc::new(
-                RemoteEnvironmentInner::new(path, builder, client.client, client.dispatch, deadline).await?,
+                RemoteEnvironmentInner::new(
+                    path,
+                    builder,
+                    client.client,
+                    client.dispatch,
+                    deadline,
+                )
+                .await?,
             ),
         })
     }
@@ -387,7 +397,11 @@ impl RemoteTransaction<RW> {
             .inner
             .env
             .cl
-            .tx_nested(self.inner.env.context(), self.inner.env.handle, self.inner.handle)
+            .tx_nested(
+                self.inner.env.context(),
+                self.inner.env.handle,
+                self.inner.handle,
+            )
             .await??;
         Ok(Self::new(self.inner.env.clone(), handle))
     }
@@ -483,7 +497,11 @@ impl RemoteTransaction<RW> {
             .inner
             .env
             .cl
-            .tx_commit(self.inner.env.context(), self.inner.env.handle, self.inner.handle)
+            .tx_commit(
+                self.inner.env.context(),
+                self.inner.env.handle,
+                self.inner.handle,
+            )
             .await??;
         self.inner.committed.store(true, Ordering::SeqCst);
         Ok((ret, lat))

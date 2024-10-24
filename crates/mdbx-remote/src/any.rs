@@ -104,27 +104,23 @@ impl EnvironmentAny {
             "mdbx" => {
                 let fpath = PathBuf::from(url.path());
                 if let Some(host) = url.host_str() {
-                    let target = format!(
-                        "{}:{}",
-                        host,
-                        url.port().unwrap_or(1899)
-                    );
-                    let addr = SocketAddr::from_str(&target).map_err(|_| ClientError::ParseError)?;
+                    let target = format!("{}:{}", host, url.port().unwrap_or(1899));
+                    let addr =
+                        SocketAddr::from_str(&target).map_err(|_| ClientError::ParseError)?;
                     let transport = tarpc::serde_transport::tcp::connect(
                         addr,
                         tarpc::tokio_serde::formats::Bincode::default,
                     )
                     .await?;
                     let client = RemoteMDBXClient::new(tarpc::client::Config::default(), transport);
-                    let env = RemoteEnvironment::open_with_builder(fpath, builder, client, deadline).await?;
+                    let env =
+                        RemoteEnvironment::open_with_builder(fpath, builder, client, deadline)
+                            .await?;
                     Ok(Self::Remote(env))
                 } else {
-                    
-
                     let env = builder.open(&fpath)?;
                     Ok(Self::Local(env))
                 }
-            
             }
             _ => Err(ClientError::ParseError),
         }

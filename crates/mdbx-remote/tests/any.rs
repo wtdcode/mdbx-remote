@@ -28,7 +28,7 @@ pub async fn remote_env() -> (TempDir, EnvironmentAny) {
         dir.path().to_path_buf(),
         Environment::builder(),
         client,
-        Duration::from_secs(5)
+        Duration::from_secs(5),
     )
     .await
     .unwrap();
