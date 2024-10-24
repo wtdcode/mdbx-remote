@@ -4,7 +4,7 @@
 
 ## Motivation
 
-[MDBX](https://libmdbx.dqdkfa.ru/) is a fast and easy-to-use KV database offering ACID properties. However, one of the limitations of MDBX is that it tries hard to prevent users from accessing the database via network to avoid potential corruption. For example, opening a database in the common collaborative mode will immediately get `MDBX_EREMOTE`. Even if you open the database via `MDBX_EXCLUSIVE`, it is still highly likely to corrupt the database or get inconsistent data if there are remote readers, which MDBX can not detect. This is super inconvenient in many cases, like just changing one or two entries.
+[MDBX](https://libmdbx.dqdkfa.ru/) is a fast and easy-to-use KV database offering ACID properties. However, one of the limitations of MDBX is that it tries hard to prevent users from accessing the database via network to avoid potential corruption. For example, opening a database in the common collaborative mode will immediately get `MDBX_EREMOTE`. Even if you open the database via `MDBX_EXCLUSIVE`, it is still highly likely to corrupt the database or get inconsistent data if there are remote readers, which MDBX can not always detect. This is super inconvenient in many cases, like just changing one or two entries.
 
 `mdbx-remote` solves this by spinning up an RPC service to expose all raw MDBX primitives.
 
