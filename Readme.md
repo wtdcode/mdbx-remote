@@ -25,6 +25,7 @@ Note `libclang-dev` is required to generate the libmdbx bindings.
 `mdbx-remote` is shipped with an `mdbx` utlity. For example, spin up an RPC endpoint:
 
 ```
+# By default, this will listen at 0.0.0.0:1899
 RUST_LOG=mdbx=info cargo run --release server
 ```
 
