@@ -4,9 +4,11 @@ use libmdbx_remote::EnvironmentAny;
 use reth_db::table::Decompress;
 use reth_db::{table::Table, PlainAccountState};
 use url::Url;
+
 fn decode_key(s: &str) -> Result<Vec<u8>> {
     Ok(alloy::hex::decode(s)?)
 }
+
 
 #[derive(Args)]
 pub struct RethArguments {
@@ -17,7 +19,7 @@ pub struct RethArguments {
     pub table: String,
 
     #[arg(index = 1, value_parser=decode_key)]
-    pub key: Vec<u8>,
+    pub key: std::vec::Vec<u8>,
 }
 
 pub async fn reth_main(args: RethArguments) -> Result<()> {
