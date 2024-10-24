@@ -109,6 +109,7 @@ The account is:
 - Reach full parity with `libmdbx-rs`.
 - Reach more parity with `reth db` operations.
 - Benchmark the performance.
+- Run Reth with remote storage.
 
 ## Credits
 
