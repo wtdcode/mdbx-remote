@@ -50,7 +50,10 @@ This exactly mimic the output of `mdbx_stat` utility from `libmdbx`. Note the `m
 One of the motivation to build `mdbx-remote` is to access reth database. `mdbx reth` can get a value from one reth table.
 
 ```
-cargo run --release reth -u mdbx://127.0.0.1/path/to/reth/db -t PlainAccountState 0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5
+cargo run --release reth \
+    -u mdbx://127.0.0.1/path/to/reth/db \
+    -t PlainAccountState \
+    0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5
 
 The account is:
 {
