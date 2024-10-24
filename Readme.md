@@ -1,10 +1,10 @@
 # MDBX-Remote
 
-`mdbx-remote` is a tool to access your mdbx databases over network safely without any concern of corrupting the databases or getting dirty data. `mdbx-remote` also provides the _same_ but _async_ programming interface as the original `libmdbx-rs` bindings, which _passes_ all tests of origin `libmdbx-rs`.
+`mdbx-remote` is a tool to access your MDBX databases over network safely without any concern of corrupting the databases or getting dirty data. `mdbx-remote` also provides the _same_ but _async_ programming interface as the original `libmdbx-rs` bindings, which _passes_ all tests of origin `libmdbx-rs`.
 
 ## Motivation
 
-[MDBX](https://libmdbx.dqdkfa.ru/) is a fast and easy-to-use KV database offering ACID properties. However, one of the limitation of MDBX is that it tries hard to prevent users to access the database via network to avoid potential corruption. For example, opening a database in the common collaborative mode will immediately get `MDBX_EREMOTE`. Even if you open the database via `MDBX_EXCLUSIVE`, it is still highly likely to corrupt the database or get inconsistent data if there are remote readers, which MDBX can not detect. This is super inconvenient in many cases, like just changing one or two entries.
+[MDBX](https://libmdbx.dqdkfa.ru/) is a fast and easy-to-use KV database offering ACID properties. However, one of the limitations of MDBX is that it tries hard to prevent users from accessing the database via network to avoid potential corruption. For example, opening a database in the common collaborative mode will immediately get `MDBX_EREMOTE`. Even if you open the database via `MDBX_EXCLUSIVE`, it is still highly likely to corrupt the database or get inconsistent data if there are remote readers, which MDBX can not detect. This is super inconvenient in many cases, like just changing one or two entries.
 
 `mdbx-remote` solves this by spinning up an RPC service to expose all raw MDBX primitives.
 
@@ -35,7 +35,7 @@ And stat any database with a url:
 cargo run --release mdbx://127.0.0.1/remote/path/to/db?ro=1
 ```
 
-This exactly mimic the output of `mdbx_stat` utility from `libmdbx`. Note the `mdbx://` url supports a subset of MDBX features by parameters including:
+This exactly mimics the output of `mdbx_stat` utility from `libmdbx`. Note the `mdbx://` URL supports a subset of MDBX features by parameters including:
 
 - `ro`: Read-only
 - `rw`: Read-write
@@ -66,7 +66,7 @@ The account is:
 
 ### For Developers
 
-`mdbx-remote` reaches almost the full parity with `libmdbx-rs` interfaces, except forcing everything to _async_ because of `tarpc`. Generally, table below shows the types for different scenarios.
+`mdbx-remote` reaches almost the full parity with `libmdbx-rs` interfaces, except forcing everything to _async_ because of `tarpc`. Generally, the table below shows the types for different scenarios.
 
 ||Environment|Database|Transaction|Cursor|
 |-|-|-|-|-|
@@ -77,7 +77,7 @@ The account is:
 ## Caveats
 
 - Only expose the RPC endpoint to trusted network because it doesn't have any protection or authentication. Tunnel the traffic via something like SSH if you really would like to expose it to public network.
-- The same database can't not be open-ed twice as inherited from MDBX.
+- The same database can't be opened twice as inherited from MDBX.
 
 ## Credits
 
