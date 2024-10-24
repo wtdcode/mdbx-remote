@@ -33,7 +33,7 @@ And stat any database with a url:
 
 ```
 # Stat a remote reth database
-cargo run --release mdbx://127.0.0.1/remote/path/to/db?ro=1
+cargo run --release stat mdbx://127.0.0.1/remote/path/to/db?ro=1
 
 Database:
 	Page size: 4096
