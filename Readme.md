@@ -32,7 +32,31 @@ RUST_LOG=mdbx=info cargo run --release server
 And stat any database with a url:
 
 ```
+# Stat a remote reth database
 cargo run --release mdbx://127.0.0.1/remote/path/to/db?ro=1
+
+Database:
+	Page size: 4096
+	Entries: 19265135020
+	Leaf Pages: 365773779
+	Branch Pages: 23212389
+	Depth: 102
+	Overflow Pages: 5270586
+Table Main:
+	Page size: 4096
+	Entries: 29
+	Leaf Pages: 1
+	Branch Pages: 0
+	Depth: 1
+	Overflow Pages: 0
+Table AccountChangeSets:
+	Page size: 4096
+	Entries: 3298505382
+	Leaf Pages: 42669897
+	Branch Pages: 13964000
+	Depth: 4
+	Overflow Pages: 0
+...
 ```
 
 This exactly mimics the output of `mdbx_stat` utility from `libmdbx`. Note the `mdbx://` URL supports a subset of MDBX features by parameters including:
