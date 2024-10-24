@@ -105,6 +105,7 @@ The account is:
 
 ## TODO
 
+- Implmenet more MDBX utilities, especially `mdbx_dump`.
 - Reach full parity with `libmdbx-rs`.
 - Reach more parity with `reth db` operations.
 - Benchmark the performance.
