@@ -23,8 +23,8 @@ use tokio_stream::Stream;
 
 use crate::{
     environment::RemoteEnvironmentConfig,
-    service::{RemoteMDBXClient, RemoteMDBXServer, ServerError},
-    CommitLatency, DatabaseFlags, EnvironmentBuilder, EnvironmentKind, Stat, TableObject,
+    service::{RemoteMDBXClient, ServerError},
+    CommitLatency, DatabaseFlags, EnvironmentBuilder, Stat, TableObject,
     TransactionKind, WriteFlags, RO, RW,
 };
 

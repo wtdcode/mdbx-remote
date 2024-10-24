@@ -1,5 +1,5 @@
 use std::{
-    collections::{hash_map::Entry, HashMap},
+    collections::HashMap,
     path::PathBuf,
     sync::Arc,
 };
@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 
 use crate::{
     environment::RemoteEnvironmentConfig, CommitLatency, Cursor, DatabaseFlags, Environment,
-    EnvironmentBuilder, EnvironmentKind, Stat, Transaction, TransactionKind, WriteFlags, RO, RW,
+    EnvironmentBuilder, Stat, Transaction, TransactionKind, WriteFlags, RO, RW,
 };
 
 #[tarpc::service]
