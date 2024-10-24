@@ -94,9 +94,9 @@ The account is:
 
 ||Environment|Database|Transaction|Cursor|
 |-|-|-|-|-|
-|Local|Environment|Database|Transaction<K>|Cursor<K>|
-|Remote|RemoteEnvironment|RemoteDatabase|RemoteTransaction<K>|RemoteCursor<K>|
-|Local or Remote|EnvironmentAny|DatabaseAny|TransactionAny<K>|CursorAny<K>|
+|Local|`Environment`|`Database`|`Transaction<K>`|`Cursor<K>`|
+|Remote|`RemoteEnvironment`|`RemoteDatabase`|`RemoteTransaction<K>`|`RemoteCursor<K>`|
+|Local or Remote|`EnvironmentAny`|`DatabaseAny`|`TransactionAny<K>`|`CursorAny<K>`|
 
 ## Caveats
 
