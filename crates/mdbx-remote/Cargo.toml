@@ -1,0 +1,57 @@
+[package]
+name = "libmdbx-remote"
+description = "Access remote mdbx database seamlessly"
+version = "0.1.0"
+# rust-version.workspace = true
+license = "Apache-2.0"
+edition.workspace = true
+# homepage.workspace = true
+# repository.workspace = true
+
+# [lints]
+# workspace = true
+
+[dependencies]
+mdbx-remote-sys.workspace = true
+
+bitflags.workspace = true
+byteorder = "1"
+derive_more.workspace = true
+indexmap = "2"
+parking_lot.workspace = true
+smallvec.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio = {workspace = true, features = ["full"]}
+dashmap = { workspace = true, features = ["inline"], optional = true }
+async-stream = {workspace = true}
+tokio-stream = {workspace = true}
+url = {workspace = true}
+tarpc = {workspace = true, features = ["full"]}
+serde = {workspace = true, features = ["derive"]}
+
+[features]
+default = []
+return-borrowed = []
+read-tx-timeouts = ["dep:dashmap"]
+
+[dev-dependencies]
+tracing-subscriber = { workspace = true, features=["env-filter"]}
+pprof = { workspace = true, features = [
+    "flamegraph",
+    "frame-pointer",
+    "criterion",
+] }
+criterion.workspace = true
+rand.workspace = true
+rand_xorshift = "0.3"
+tempfile.workspace = true
+paste.workspace = true
+futures-util.workspace =true
+# [[bench]]
+# name = "cursor"
+# harness = false
+
+# [[bench]]
+# name = "transaction"
+# harness = false

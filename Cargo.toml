@@ -1,0 +1,33 @@
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+reth-libmdbx = {git = "https://github.com/paradigmxyz/reth", rev = "v1.1.0" }
+tarpc = {version = "0.34"}
+tokio = {version = "1.0", features = ["full"]}
+serde = {version = "1.0"}
+thiserror = "1.0"
+tracing = "0.1.0"
+tracing-subscriber = "0.3"
+parking_lot = "0.12"
+smallvec = "1"
+derive_more = { version = "1", features = ["full"] }
+bitflags = "2.4"
+dashmap = "6.0"
+async-stream = "0.3"
+tokio-stream = "0.1"
+url = "2.0"
+paste = "1.0"
+pprof = "0.13"
+rand = "0.8.5"
+tempfile = "3.8"
+criterion = "0.5"
+futures-util = "0.3"
+libmdbx-remote = {version = "0.1", path = "crates/mdbx-remote", default-features = false}
+mdbx-utils = {version = "0.1", path = "crates/mdbx-utils", default-features = false}
+mdbx-remote-sys = {version = "0.1", path = "crates/mdbx-remote/mdbx-sys", default-features = false}
