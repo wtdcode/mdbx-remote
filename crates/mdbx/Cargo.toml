@@ -13,3 +13,6 @@ color-eyre = {version = "0.6"}
 tarpc = {workspace = true, features = ["full"]}
 tokio-stream = {workspace = true}
 url.workspace = true
+alloy = {version = "0.5", features = ["full"]}
+reth-db = {git = "https://github.com/paradigmxyz/reth", rev = "v1.1.0"}
+serde_json = {version = "1.0"}
