@@ -79,6 +79,12 @@ The account is:
 - Only expose the RPC endpoint to trusted network because it doesn't have any protection or authentication. Tunnel the traffic via something like SSH if you really would like to expose it to public network.
 - The same database can't be opened twice as inherited from MDBX.
 
+## TODO
+
+- Reach full parity with `libmdbx-rs`.
+- Reach more parity with `reth db` operations.
+- Benchmark the performance.
+
 ## Credits
 
 The bindings is forked from reth v1.1.0.
