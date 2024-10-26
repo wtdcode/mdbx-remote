@@ -19,6 +19,9 @@ use std::{
     time::Duration,
 };
 
+#[cfg(feature = "read-tx-timeouts")]
+use crate::ffi::mdbx_txn_renew;
+
 mod private {
     use super::*;
 
