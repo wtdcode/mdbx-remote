@@ -8,8 +8,8 @@ use tokio_stream::Stream;
 use crate::{
     remote::{ClientError, RemoteCursor, RemoteDatabase, RemoteEnvironment, RemoteTransaction},
     service::RemoteMDBXClient,
-    CommitLatency, Cursor, Database, DatabaseFlags, Environment, EnvironmentFlags, Mode, Stat,
-    TableObject, Transaction, TransactionKind, WriteFlags, RO, RW,
+    CommitLatency, Cursor, Database, DatabaseFlags, Environment, EnvironmentFlags, EnvironmentKind,
+    Info, Mode, Stat, TableObject, Transaction, TransactionKind, WriteFlags, RO, RW,
 };
 
 type Result<T> = std::result::Result<T, ClientError>;
@@ -153,6 +153,32 @@ impl EnvironmentAny {
             Self::Local(env) => Ok(env.stat()?),
             Self::Remote(env) => Ok(env.stat().await?),
         }
+    }
+
+    pub async fn info(&self) -> Result<Info> {
+        match self {
+            Self::Local(env) => Ok(env.info()?),
+            Self::Remote(env) => Ok(env.info().await?),
+        }
+    }
+
+    pub fn env_kind(&self) -> EnvironmentKind {
+        match self {
+            Self::Local(env) => env.env_kind(),
+            Self::Remote(env) => env.env_kind(),
+        }
+    }
+
+    pub fn is_write_map(&self) -> bool {
+        self.env_kind().is_write_map()
+    }
+
+    pub async fn is_read_write(&self) -> Result<bool> {
+        Ok(!self.is_read_only().await?)
+    }
+
+    pub async fn is_read_only(&self) -> Result<bool> {
+        Ok(matches!(self.info().await?.mode(), Mode::ReadOnly))
     }
 }
 

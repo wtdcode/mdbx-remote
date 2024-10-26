@@ -25,8 +25,8 @@ use tokio_stream::Stream;
 use crate::{
     environment::RemoteEnvironmentConfig,
     service::{RemoteMDBXClient, ServerError},
-    CommitLatency, DatabaseFlags, EnvironmentBuilder, Stat, TableObject, TransactionKind,
-    WriteFlags, RO, RW,
+    CommitLatency, DatabaseFlags, EnvironmentBuilder, EnvironmentKind, Info, Mode, Stat,
+    TableObject, TransactionKind, WriteFlags, RO, RW,
 };
 
 macro_rules! mdbx_try_optional {
@@ -111,6 +111,7 @@ pub(crate) struct RemoteEnvironmentInner {
     handle: u64,
     cl: RemoteMDBXClient,
     deadline: Duration,
+    kind: EnvironmentKind,
     ch: oneshot::Sender<()>,
 }
 
@@ -144,6 +145,7 @@ impl RemoteEnvironmentInner {
             tracing::debug!("Dispatcher dies");
         });
         let remote = RemoteEnvironmentConfig::from(builder);
+        let kind = remote.env_kind();
         let handle = client
             .open_env(context_deadline(deadline), path, remote)
             .await??;
@@ -151,6 +153,7 @@ impl RemoteEnvironmentInner {
             handle: handle,
             cl: client,
             deadline: deadline,
+            kind: kind,
             ch: tx,
         })
     }
@@ -236,6 +239,30 @@ impl RemoteEnvironment {
             .cl
             .env_stat(self.inner.context(), self.inner.handle)
             .await??)
+    }
+
+    pub async fn info(&self) -> Result<Info> {
+        Ok(self
+            .inner
+            .cl
+            .env_info(self.inner.context(), self.inner.handle)
+            .await??)
+    }
+
+    pub fn env_kind(&self) -> EnvironmentKind {
+        self.inner.kind
+    }
+
+    pub fn is_write_map(&self) -> bool {
+        self.inner.kind.is_write_map()
+    }
+
+    pub async fn is_read_write(&self) -> Result<bool> {
+        Ok(!self.is_read_only().await?)
+    }
+
+    pub async fn is_read_only(&self) -> Result<bool> {
+        Ok(matches!(self.info().await?.mode(), Mode::ReadOnly))
     }
 }
 

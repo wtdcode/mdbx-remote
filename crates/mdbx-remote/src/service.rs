@@ -6,7 +6,7 @@ use tokio::sync::RwLock;
 
 use crate::{
     environment::RemoteEnvironmentConfig, CommitLatency, Cursor, DatabaseFlags, Environment,
-    EnvironmentBuilder, Stat, Transaction, TransactionKind, WriteFlags, RO, RW,
+    EnvironmentBuilder, Info, Stat, Transaction, TransactionKind, WriteFlags, RO, RW,
 };
 
 #[tarpc::service]
@@ -18,6 +18,7 @@ pub trait RemoteMDBX {
     async fn env_sync(env: u64, force: bool) -> Result<bool, ServerError>;
     async fn env_close(env: u64) -> Result<(), ServerError>;
     async fn env_stat(env: u64) -> Result<Stat, ServerError>;
+    async fn env_info(env: u64) -> Result<Info, ServerError>;
 
     async fn tx_create_db(
         env: u64,
@@ -230,7 +231,26 @@ impl RemoteMDBX for RemoteMDBXServer {
             .ok_or(ServerError::NOENV)?
             .env
             .clone();
-        let ret = tokio::task::spawn_blocking(move || env.stat()).await??;
+        let ret = env.stat()?;
+
+        Ok(ret)
+    }
+
+    async fn env_info(
+        self,
+        _context: tarpc::context::Context,
+        env: u64,
+    ) -> Result<Info, ServerError> {
+        let env = self
+            .state
+            .read()
+            .await
+            .envs
+            .get(&env)
+            .ok_or(ServerError::NOENV)?
+            .env
+            .clone();
+        let ret = env.info()?;
 
         Ok(ret)
     }
@@ -250,6 +270,7 @@ impl RemoteMDBX for RemoteMDBXServer {
             .ok_or(ServerError::NOENV)?
             .env
             .clone();
+        // This can block for a very time, though not forever
         let ret = tokio::task::spawn_blocking(move || env.sync(force)).await??;
 
         Ok(ret)
@@ -344,7 +365,8 @@ impl RemoteMDBX for RemoteMDBXServer {
             if flags.contains(DatabaseFlags::CREATE) {
                 return Err(ServerError::NOWRITABLE);
             }
-            // This can block
+            // This can block? can it?
+            // But anyway opening databases should be not so frequent so overhead should be acceptable.
             tokio::task::spawn_blocking(move || tx.open_db(db.as_deref())).await??
         } else {
             return Err(ServerError::NOTX);
@@ -440,6 +462,7 @@ impl RemoteMDBX for RemoteMDBXServer {
             env.rwtxs.remove(&tx).ok_or(ServerError::NOTX)?
         };
 
+        // This can be slow, wrap it in spawn_blocking
         Ok(tokio::task::spawn_blocking(move || tx.tx.commit()).await??)
     }
 
@@ -487,6 +510,7 @@ impl RemoteMDBX for RemoteMDBXServer {
             .tx
             .clone();
 
+        // Can this block forever? Anyway, wrap it with spawn_blocking for safety.
         let new_tx = tokio::task::spawn_blocking(move || tx.begin_nested_txn()).await??;
 
         let mut lg = self.state.write().await;
@@ -518,11 +542,11 @@ impl RemoteMDBX for RemoteMDBXServer {
         let stat = if let Some(rw) = env.rwtxs.get(&tx) {
             let tx = rw.tx.clone();
             drop(lg);
-            tokio::task::spawn_blocking(move || tx.db_stat_with_dbi(dbi)).await??
+            tx.db_stat_with_dbi(dbi)?
         } else if let Some(ro) = env.rotxs.get(&tx) {
             let tx = ro.tx.clone();
             drop(lg);
-            tokio::task::spawn_blocking(move || tx.db_stat_with_dbi(dbi)).await??
+            tx.db_stat_with_dbi(dbi)?
         } else {
             return Err(ServerError::NOTX);
         };
@@ -550,6 +574,7 @@ impl RemoteMDBX for RemoteMDBXServer {
             .tx
             .clone();
 
+        // This can be slow
         tokio::task::spawn_blocking(move || tx.clear_db(dbi)).await??;
         Ok(())
     }

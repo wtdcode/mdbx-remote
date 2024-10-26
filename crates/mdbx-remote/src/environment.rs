@@ -4,7 +4,7 @@ use crate::{
     flags::EnvironmentFlags,
     transaction::{RO, RW},
     txn_manager::{TxnManager, TxnManagerMessage, TxnPtr},
-    Transaction, TransactionKind,
+    Mode, SyncMode, Transaction, TransactionKind,
 };
 use byteorder::{ByteOrder, NativeEndian};
 use mem::size_of;
@@ -73,14 +73,14 @@ impl Environment {
 
     /// Returns true if the environment was opened in [`crate::Mode::ReadWrite`] mode.
     #[inline]
-    pub fn is_read_write(&self) -> bool {
-        self.inner.env_kind.is_write_map()
+    pub fn is_read_write(&self) -> Result<bool> {
+        Ok(!self.is_read_only()?)
     }
 
     /// Returns true if the environment was opened in [`crate::Mode::ReadOnly`] mode.
     #[inline]
-    pub fn is_read_only(&self) -> bool {
-        !self.inner.env_kind.is_write_map()
+    pub fn is_read_only(&self) -> Result<bool> {
+        Ok(matches!(self.info()?.mode(), Mode::ReadOnly))
     }
 
     /// Returns the transaction manager.
@@ -372,13 +372,42 @@ impl GeometryInfo {
 /// Environment information.
 ///
 /// Contains environment information about the map size, readers, last txn id etc.
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 #[repr(transparent)]
 pub struct Info(ffi::MDBX_envinfo);
 
 impl Info {
     pub const fn geometry(&self) -> GeometryInfo {
         GeometryInfo(self.0.mi_geo)
+    }
+
+    pub const fn mode(&self) -> Mode {
+        let mode = self.0.mi_mode;
+        if (mode & ffi::MDBX_RDONLY) != 0 {
+            Mode::ReadOnly
+        } else {
+            if (mode & ffi::MDBX_SYNC_DURABLE) != 0 {
+                Mode::ReadWrite {
+                    sync_mode: SyncMode::Durable,
+                }
+            } else if (mode & ffi::MDBX_UTTERLY_NOSYNC) != 0 {
+                Mode::ReadWrite {
+                    sync_mode: SyncMode::UtterlyNoSync,
+                }
+            } else if (mode & ffi::MDBX_NOMETASYNC) != 0 {
+                Mode::ReadWrite {
+                    sync_mode: SyncMode::NoMetaSync,
+                }
+            } else if (mode & ffi::MDBX_SAFE_NOSYNC) != 0 {
+                Mode::ReadWrite {
+                    sync_mode: SyncMode::SafeNoSync,
+                }
+            } else {
+                Mode::ReadWrite {
+                    sync_mode: SyncMode::Durable,
+                }
+            }
+        }
     }
 
     /// Size of memory map.
@@ -617,6 +646,12 @@ impl From<EnvironmentBuilder> for RemoteEnvironmentConfig {
             #[cfg(feature = "read-tx-timeouts")]
             max_read_transaction_duration: None,
         }
+    }
+}
+
+impl RemoteEnvironmentConfig {
+    pub(crate) fn env_kind(&self) -> EnvironmentKind {
+        self.kind
     }
 }
 

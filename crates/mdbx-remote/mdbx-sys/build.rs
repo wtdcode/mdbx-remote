@@ -97,7 +97,7 @@ fn generate_bindings(mdbx: &Path, out_file: &Path) {
         }
 
         fn add_derives(&self, _info: &bindgen::callbacks::DeriveInfo<'_>) -> Vec<String> {
-            let serde_list = &["MDBX_commit_latency", "MDBX_stat"];
+            let serde_list = &["MDBX_commit_latency", "MDBX_stat", "MDBX_envinfo"];
 
             for candidate in serde_list.iter() {
                 if _info.name.starts_with(candidate) {
