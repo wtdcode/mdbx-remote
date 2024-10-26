@@ -40,7 +40,17 @@ jobs:
           password: ${{ secrets.MDBX_DOCKERHUB }}
 
       - name: Build and push
+        if: "!startsWith(github.ref, 'refs/tags')"
         uses: docker/build-push-action@v6
         with:
           push: true
           tags: lazymio/mdbx-remote:latest
+      
+      - name: Build and push with github ref
+        if: "startsWith(github.ref, 'refs/tags')"
+        uses: docker/build-push-action@v6
+        with:
+          push: true
+          tags: |
+            lazymio/mdbx-remote:latest
+            lazymio/mdbx-remote:${{github.ref_name}}

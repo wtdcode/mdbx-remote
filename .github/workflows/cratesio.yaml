@@ -1,0 +1,35 @@
+name: Crates.io Distribution
+
+on:
+  push:
+    - '**.rs'
+    - '**.toml'
+    - '**.lock'
+    - '**.yaml'
+    - 'Dockerfile'
+    - 'crates/mdbx-remote/mdbx-sys/libmdbx/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+    steps:
+      - name: 'Pull sources'
+        uses: actions/checkout@v4
+
+      - name: 'Set up Rust'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: 'Cargo test'
+        if: "!startsWith(github.ref, 'refs/tags')"
+        timeout-minutes: 5
+        run: |
+          cargo test
+
+      - name: 'Cargo Publish'
+        if: startsWith(github.ref, 'refs/tags')
+        timeout-minutes: 5
+        env:
+          TOKEN: ${{ secrets.MDBX_CRATES_IO }}
+        run: |
+          cargo login $TOKEN && cargo test && cargo publish
