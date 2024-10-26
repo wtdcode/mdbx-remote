@@ -20,6 +20,10 @@ cargo build --release
 
 Note `libclang-dev` is required to generate the libmdbx bindings.
 
+### Docker Image
+
+Alternatively, there is a [docker image](https://hub.docker.com/r/lazymio/mdbx-remote) provided to help setup.
+
 ### MDBX Utility
 
 `mdbx-remote` is shipped with an `mdbx` utlity. For example, spin up an RPC endpoint:
@@ -27,6 +31,8 @@ Note `libclang-dev` is required to generate the libmdbx bindings.
 ```
 # By default, this will listen at 0.0.0.0:1899
 RUST_LOG=mdbx=info cargo run --release server
+# Or 
+docker run --rm -it --env RUST_LOG=info lazymio/mdbx-remote server
 ```
 
 And stat any database with a url:
@@ -34,6 +40,8 @@ And stat any database with a url:
 ```
 # Stat a remote reth database
 cargo run --release stat mdbx://127.0.0.1/remote/path/to/db?ro=1
+# Or
+docker run --rm -it --env RUST_LOG=info --network host lazymio/mdbx-remote stat mdbx://127.0.0.1/remote/path/to/db?ro=1
 
 Database:
 	Page size: 4096
@@ -76,6 +84,11 @@ One of the motivation to build `mdbx-remote` is to access reth database. `mdbx r
 
 ```
 cargo run --release reth \
+    -u mdbx://127.0.0.1/path/to/reth/db \
+    -t PlainAccountState \
+    0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5
+# Or
+docker run --rm -it --network host lazymio/mdbx-remote reth \
     -u mdbx://127.0.0.1/path/to/reth/db \
     -t PlainAccountState \
     0x95222290DD7278Aa3Ddd389Cc1E1d165CC4BAfe5
