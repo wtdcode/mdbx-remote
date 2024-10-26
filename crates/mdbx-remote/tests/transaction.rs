@@ -1,10 +1,8 @@
 #![allow(missing_docs)]
 use libmdbx_remote::*;
-use std::{
-    borrow::Cow,
-    sync::{Arc, Barrier},
-};
+use std::{borrow::Cow, sync::Arc};
 use tempfile::tempdir;
+use tokio::sync::Barrier;
 // use tokio_stream::StreamExt;
 use futures_util::StreamExt;
 mod any;
@@ -12,15 +10,17 @@ mod any;
 macro_rules! local_remote {
     ($test: tt) => {
         paste::paste! {
-            #[tokio::test(flavor = "multi_thread")]
+            #[tokio::test(flavor = "multi_thread", worker_threads = 1)] // Intentionally reduce worker threads to expose deadlock issues
             async fn [<$test _remote>]() {
+                // console_subscriber::init();
                 let (db, env) = any::remote_env().await;
                 $test(env).await;
                 db.close().unwrap();
             }
 
-            #[tokio::test(flavor = "multi_thread")]
+            #[tokio::test(flavor = "multi_thread", worker_threads = 1)] // Intentionally reduce worker threads to expose deadlock issues
             async fn [<$test _local>]() {
+                // console_subscriber::init();
                 let (db, env) = any::local_env();
                 $test(env).await;
                 db.close().unwrap();
@@ -291,8 +291,8 @@ async fn test_concurrent_readers_single_writer(env: EnvironmentAny) {
                 let db = txn.open_db(None).await.unwrap();
                 assert_eq!(txn.get::<()>(db.dbi(), key).await.unwrap(), None);
             }
-            reader_barrier.wait();
-            reader_barrier.wait();
+            reader_barrier.wait().await;
+            reader_barrier.wait().await;
             {
                 let txn = reader_env.begin_ro_txn().await.unwrap();
                 let db = txn.open_db(None).await.unwrap();
@@ -304,13 +304,13 @@ async fn test_concurrent_readers_single_writer(env: EnvironmentAny) {
     let txn = env.begin_rw_txn().await.unwrap();
     let db = txn.open_db(None).await.unwrap();
 
-    barrier.wait();
+    barrier.wait().await;
     txn.put(db.dbi(), key, val, WriteFlags::empty())
         .await
         .unwrap();
     txn.commit().await.unwrap();
 
-    barrier.wait();
+    barrier.wait().await;
 
     for hdl in threads {
         assert_eq!(hdl.await.unwrap(), true);

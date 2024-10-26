@@ -150,6 +150,14 @@ pub enum ServerError {
     NOPATH,
     #[error("not writable")]
     NOWRITABLE,
+    #[error("tokio: {0}")]
+    TOKIO(String),
+}
+
+impl From<tokio::task::JoinError> for ServerError {
+    fn from(value: tokio::task::JoinError) -> Self {
+        Self::TOKIO(value.to_string())
+    }
 }
 
 impl From<crate::error::Error> for ServerError {
@@ -179,7 +187,7 @@ impl RemoteMDBX for RemoteMDBXServer {
         let abs_path = std::path::absolute(path).map_err(|_| ServerError::NOPATH)?;
         let handle = {
             let builder = EnvironmentBuilder::from(cfg);
-            let env = builder.open(&abs_path)?;
+            let env = tokio::task::spawn_blocking(move || builder.open(&abs_path)).await??;
             let mut lg = self.state.write().await;
             let handle = lg.next_id();
 
@@ -213,9 +221,16 @@ impl RemoteMDBX for RemoteMDBXServer {
         _context: tarpc::context::Context,
         env: u64,
     ) -> Result<Stat, ServerError> {
-        let lg = self.state.read().await;
-
-        let ret = lg.envs.get(&env).ok_or(ServerError::NOENV)?.env.stat()?;
+        let env = self
+            .state
+            .read()
+            .await
+            .envs
+            .get(&env)
+            .ok_or(ServerError::NOENV)?
+            .env
+            .clone();
+        let ret = tokio::task::spawn_blocking(move || env.stat()).await??;
 
         Ok(ret)
     }
@@ -226,14 +241,16 @@ impl RemoteMDBX for RemoteMDBXServer {
         env: u64,
         force: bool,
     ) -> Result<bool, ServerError> {
-        let lg = self.state.read().await;
-
-        let ret = lg
+        let env = self
+            .state
+            .read()
+            .await
             .envs
             .get(&env)
             .ok_or(ServerError::NOENV)?
             .env
-            .sync(force)?;
+            .clone();
+        let ret = tokio::task::spawn_blocking(move || env.sync(force)).await??;
 
         Ok(ret)
     }
@@ -252,7 +269,8 @@ impl RemoteMDBX for RemoteMDBXServer {
             .ok_or(ServerError::NOENV)?
             .env
             .clone();
-        let tx = env_clone.begin_ro_txn()?;
+        // This can block forever
+        let tx = tokio::task::spawn_blocking(move || env_clone.begin_ro_txn()).await??;
 
         // hold write lock now, because no deadlock will happen
         let mut lg = self.state.write().await;
@@ -284,7 +302,8 @@ impl RemoteMDBX for RemoteMDBXServer {
             .ok_or(ServerError::NOENV)?
             .env
             .clone();
-        let tx = env_clone.begin_rw_txn()?;
+        // This can block forever
+        let tx = tokio::task::spawn_blocking(move || env_clone.begin_rw_txn()).await??;
 
         // hold write lock now, because no deadlock will happen
         let mut lg = self.state.write().await;
@@ -317,14 +336,16 @@ impl RemoteMDBX for RemoteMDBXServer {
         let db = if let Some(tx) = env.rwtxs.get(&tx) {
             let tx = tx.tx.clone();
             drop(lg);
-            tx.open_db_with_flags(db.as_deref(), flags)?
+            tokio::task::spawn_blocking(move || tx.open_db_with_flags(db.as_deref(), flags))
+                .await??
         } else if let Some(tx) = env.rotxs.get(&tx) {
             let tx = tx.tx.clone();
             drop(lg);
             if flags.contains(DatabaseFlags::CREATE) {
                 return Err(ServerError::NOWRITABLE);
             }
-            tx.open_db(db.as_deref())?
+            // This can block
+            tokio::task::spawn_blocking(move || tx.open_db(db.as_deref())).await??
         } else {
             return Err(ServerError::NOTX);
         };
@@ -346,15 +367,14 @@ impl RemoteMDBX for RemoteMDBXServer {
         let val = if let Some(tx) = env.rwtxs.get(&tx) {
             let tx = tx.tx.clone();
             drop(lg);
-            tx.get::<Vec<u8>>(dbi, &key)?
-        } else if let Some(tx) = env.rotxs.get(&tx) {
-            let tx = tx.tx.clone();
+            tokio::task::spawn_blocking(move || tx.get::<Vec<u8>>(dbi, &key)).await??
+        } else if let Some(ro) = env.rotxs.get(&tx) {
+            let tx_clone = ro.tx.clone();
             drop(lg);
-            tx.get::<Vec<u8>>(dbi, &key)?
+            tx_clone.get::<Vec<u8>>(dbi, &key)?
         } else {
             return Err(ServerError::NOTX);
         };
-
         Ok(val)
     }
 
@@ -420,7 +440,7 @@ impl RemoteMDBX for RemoteMDBXServer {
             env.rwtxs.remove(&tx).ok_or(ServerError::NOTX)?
         };
 
-        Ok(tx.tx.commit()?)
+        Ok(tokio::task::spawn_blocking(move || tx.tx.commit()).await??)
     }
 
     async fn tx_abort(
@@ -467,7 +487,7 @@ impl RemoteMDBX for RemoteMDBXServer {
             .tx
             .clone();
 
-        let new_tx = tx.begin_nested_txn()?;
+        let new_tx = tokio::task::spawn_blocking(move || tx.begin_nested_txn()).await??;
 
         let mut lg = self.state.write().await;
         let env = lg.envs.get_mut(&env).ok_or(ServerError::NOENV)?;
@@ -496,9 +516,13 @@ impl RemoteMDBX for RemoteMDBXServer {
         let env = lg.envs.get(&env).ok_or(ServerError::NOENV)?;
 
         let stat = if let Some(rw) = env.rwtxs.get(&tx) {
-            rw.tx.db_stat_with_dbi(dbi)?
+            let tx = rw.tx.clone();
+            drop(lg);
+            tokio::task::spawn_blocking(move || tx.db_stat_with_dbi(dbi)).await??
         } else if let Some(ro) = env.rotxs.get(&tx) {
-            ro.tx.db_stat_with_dbi(dbi)?
+            let tx = ro.tx.clone();
+            drop(lg);
+            tokio::task::spawn_blocking(move || tx.db_stat_with_dbi(dbi)).await??
         } else {
             return Err(ServerError::NOTX);
         };
@@ -526,7 +550,7 @@ impl RemoteMDBX for RemoteMDBXServer {
             .tx
             .clone();
 
-        tx.clear_db(dbi)?;
+        tokio::task::spawn_blocking(move || tx.clear_db(dbi)).await??;
         Ok(())
     }
 
@@ -549,7 +573,7 @@ impl RemoteMDBX for RemoteMDBXServer {
             .ok_or(ServerError::NOTX)?
             .tx
             .clone();
-        let cur = tx_clone.cursor_with_dbi(dbi)?;
+        let cur = tokio::task::spawn_blocking(move || tx_clone.cursor_with_dbi(dbi)).await??;
         let mut lg = self.state.write().await;
         let tx_mut = lg
             .envs
@@ -583,7 +607,7 @@ impl RemoteMDBX for RemoteMDBXServer {
             .ok_or(ServerError::NOTX)?
             .tx
             .clone();
-        let cur = tx_clone.cursor_with_dbi(dbi)?;
+        let cur = tokio::task::spawn_blocking(move || tx_clone.cursor_with_dbi(dbi)).await??;
         let mut lg = self.state.write().await;
         let tx_mut = lg
             .envs
@@ -605,6 +629,8 @@ impl RemoteMDBX for RemoteMDBXServer {
         tx: u64,
         cur: u64,
     ) -> Result<u64, ServerError> {
+        // Cloning a cursor has an extra overhead of mdbx call, don't wrap them
+        // in a tokio::task::spawn_blocking
         let mut lg = self.state.write().await;
 
         let env = lg.envs.get_mut(&env).ok_or(ServerError::NOENV)?;

@@ -9,7 +9,6 @@ fn decode_key(s: &str) -> Result<Vec<u8>> {
     Ok(alloy::hex::decode(s)?)
 }
 
-
 #[derive(Args)]
 pub struct RethArguments {
     #[arg(short, long)]

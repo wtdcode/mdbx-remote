@@ -12,14 +12,14 @@ mod any;
 macro_rules! local_remote {
     ($test: tt) => {
         paste! {
-            #[tokio::test(flavor = "multi_thread")]
+            #[tokio::test(flavor = "multi_thread", worker_threads = 1)] // Intentionally reduce worker threads to expose deadlock issues
             async fn [<$test _remote>]() {
                 let (db, env) = remote_env().await;
                 $test(env).await;
                 db.close().unwrap();
             }
 
-            #[tokio::test(flavor = "multi_thread")]
+            #[tokio::test(flavor = "multi_thread", worker_threads = 1)] // Intentionally reduce worker threads to expose deadlock issues
             async fn [<$test _local>]() {
                 let (db, env) = local_env();
                 $test(env).await;

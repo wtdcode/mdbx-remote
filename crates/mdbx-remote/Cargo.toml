@@ -48,6 +48,7 @@ rand_xorshift = "0.3"
 tempfile.workspace = true
 paste.workspace = true
 futures-util.workspace =true
+console-subscriber = "0.4"
 # [[bench]]
 # name = "cursor"
 # harness = false
