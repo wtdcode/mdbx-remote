@@ -26,9 +26,7 @@ pub async fn reth_main(args: RethArguments) -> Result<()> {
 
     match args.table.to_lowercase().as_str() {
         "plainaccountstate" => {
-            let db = tx
-                .open_db(Some(PlainAccountState::NAME.to_string()))
-                .await?;
+            let db = tx.open_db(Some(PlainAccountState::NAME)).await?;
             let val = tx.get::<Vec<u8>>(db.dbi(), &args.key).await?;
             let val = val
                 .map(|t| <PlainAccountState as reth_db::table::Table>::Value::decompress(&t))

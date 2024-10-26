@@ -41,7 +41,7 @@ pub async fn stat_main(args: StatArguments) -> Result<()> {
         while let Some(it) = st.next().await {
             let (k, _) = it?;
             let table = String::from_utf8(k)?;
-            let db = tx.open_db(Some(table.clone())).await?;
+            let db = tx.open_db(Some(&table)).await?;
 
             let stat = tx.db_stat(&db).await?;
             println!("Table {}:", table);

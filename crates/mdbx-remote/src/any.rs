@@ -204,12 +204,12 @@ pub enum TransactionAny<K: TransactionKind> {
 }
 
 impl<K: TransactionKind> TransactionAny<K> {
-    pub async fn open_db(&self, db: Option<String>) -> Result<DatabaseAny> {
+    pub async fn open_db(&self, db: Option<&str>) -> Result<DatabaseAny> {
         match self {
-            Self::Local(tx) => Ok(DatabaseAny::Local(
-                tx.open_db(db.as_ref().map(|t| t.as_str()))?,
+            Self::Local(tx) => Ok(DatabaseAny::Local(tx.open_db(db)?)),
+            Self::Remote(tx) => Ok(DatabaseAny::Remote(
+                tx.open_db(db.map(|t| t.to_string())).await?,
             )),
-            Self::Remote(tx) => Ok(DatabaseAny::Remote(tx.open_db(db).await?)),
         }
     }
 
@@ -274,12 +274,12 @@ impl TransactionAny<RW> {
         }
     }
 
-    pub async fn create_db(&self, db: Option<String>, flags: DatabaseFlags) -> Result<DatabaseAny> {
+    pub async fn create_db(&self, db: Option<&str>, flags: DatabaseFlags) -> Result<DatabaseAny> {
         match self {
-            Self::Local(tx) => Ok(DatabaseAny::Local(
-                tx.create_db(db.as_ref().map(|t| t.as_str()), flags)?,
+            Self::Local(tx) => Ok(DatabaseAny::Local(tx.create_db(db, flags)?)),
+            Self::Remote(tx) => Ok(DatabaseAny::Remote(
+                tx.create_db(db.map(|t| t.to_string()), flags).await?,
             )),
-            Self::Remote(tx) => Ok(DatabaseAny::Remote(tx.create_db(db, flags).await?)),
         }
     }
 
