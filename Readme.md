@@ -98,6 +98,12 @@ The account is:
 |Remote|`RemoteEnvironment`|`RemoteDatabase`|`RemoteTransaction<K>`|`RemoteCursor<K>`|
 |Local or Remote|`EnvironmentAny`|`DatabaseAny`|`TransactionAny<K>`|`CursorAny<K>`|
 
+Add this to your Cargo.toml:
+
+```
+libmdbx-remote = "0.1"
+```
+
 ## Caveats
 
 - Only expose the RPC endpoint to trusted network because it doesn't have any protection or authentication. Tunnel the traffic via something like SSH if you really would like to expose it to public network.
