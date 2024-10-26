@@ -18,7 +18,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: 'Setup libclang'
-        run: apt update && apt install libclang-dev
+        run: sudo apt update && sudo apt install -y libclang-dev
       
       - name: 'Test'
         run: cargo test
