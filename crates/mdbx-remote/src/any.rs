@@ -21,7 +21,8 @@ pub enum EnvironmentAny {
 }
 
 impl EnvironmentAny {
-    pub async fn open(url: &url::Url) -> Result<Self> {
+    pub async fn open(url: &str) -> Result<Self> {
+        let url = url::Url::parse(url).map_err(|e| ClientError::WrongURL(e))?;
         let mut builder = Environment::builder();
 
         let args: HashMap<String, String> = url

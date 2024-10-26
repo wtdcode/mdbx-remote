@@ -3,7 +3,6 @@ use color_eyre::Result;
 use libmdbx_remote::EnvironmentAny;
 use reth_db::table::Decompress;
 use reth_db::{table::Table, PlainAccountState};
-use url::Url;
 
 fn decode_key(s: &str) -> Result<Vec<u8>> {
     Ok(alloy::hex::decode(s)?)
@@ -12,7 +11,7 @@ fn decode_key(s: &str) -> Result<Vec<u8>> {
 #[derive(Args)]
 pub struct RethArguments {
     #[arg(short, long)]
-    pub url: Url,
+    pub url: String,
 
     #[arg(short, long)]
     pub table: String,

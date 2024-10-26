@@ -1,14 +1,13 @@
 use clap::Args;
 use libmdbx_remote::{EnvironmentAny, Stat};
 use tokio_stream::StreamExt;
-use url::Url;
 
 use color_eyre::Result;
 
 #[derive(Args)]
 pub struct StatArguments {
     #[arg(index = 1)]
-    pub url: Url,
+    pub url: String,
 
     #[arg(short, long)]
     pub all: bool,

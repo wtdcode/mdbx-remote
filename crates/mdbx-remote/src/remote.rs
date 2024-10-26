@@ -67,8 +67,10 @@ pub enum ClientError {
     MDBX(crate::error::Error),
     #[error("RPC error: {0}")]
     RPC(tarpc::client::RpcError),
-    #[error("url parse error")]
+    #[error("parse error")]
     ParseError,
+    #[error("url parse error: {0}")]
+    WrongURL(url::ParseError),
     #[error("IO error: {0}")]
     IO(std::io::Error),
     #[error("Server error: {0}")]
