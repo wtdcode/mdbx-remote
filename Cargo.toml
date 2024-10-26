@@ -5,6 +5,8 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+homepage = "https://github.com/wtdcode/mdbx-remote"
+repository = "https://github.com/wtdcode/mdbx-remote"
 
 [workspace.dependencies]
 reth-libmdbx = {git = "https://github.com/paradigmxyz/reth", rev = "v1.1.0" }
