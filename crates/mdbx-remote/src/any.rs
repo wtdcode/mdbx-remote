@@ -129,21 +129,34 @@ impl EnvironmentAny {
 
     pub async fn begin_ro_txn(&self) -> Result<TransactionAny<RO>> {
         match self {
-            Self::Local(env) => Ok(TransactionAny::Local(env.begin_ro_txn()?)),
+            Self::Local(env) => {
+                let env = env.clone();
+                Ok(TransactionAny::Local(
+                    tokio::task::spawn_blocking(move || env.begin_ro_txn()).await??,
+                ))
+            }
             Self::Remote(env) => Ok(TransactionAny::Remote(env.begin_ro_txn().await?)),
         }
     }
 
     pub async fn begin_rw_txn(&self) -> Result<TransactionAny<RW>> {
         match self {
-            Self::Local(env) => Ok(TransactionAny::Local(env.begin_rw_txn()?)),
+            Self::Local(env) => {
+                let env = env.clone();
+                Ok(TransactionAny::Local(
+                    tokio::task::spawn_blocking(move || env.begin_rw_txn()).await??,
+                ))
+            }
             Self::Remote(env) => Ok(TransactionAny::Remote(env.begin_rw_txn().await?)),
         }
     }
 
     pub async fn sync(&self, force: bool) -> Result<bool> {
         match self {
-            Self::Local(env) => Ok(env.sync(force)?),
+            Self::Local(env) => {
+                let env = env.clone();
+                Ok(tokio::task::spawn_blocking(move || env.sync(force)).await??)
+            }
             Self::Remote(env) => Ok(env.sync(force).await?),
         }
     }
@@ -206,7 +219,16 @@ pub enum TransactionAny<K: TransactionKind> {
 impl<K: TransactionKind> TransactionAny<K> {
     pub async fn open_db(&self, db: Option<&str>) -> Result<DatabaseAny> {
         match self {
-            Self::Local(tx) => Ok(DatabaseAny::Local(tx.open_db(db)?)),
+            Self::Local(tx) => {
+                let tx = tx.clone();
+                let db = db.map(|t| t.to_string());
+                Ok(DatabaseAny::Local(
+                    tokio::task::spawn_blocking(move || {
+                        tx.open_db(db.as_ref().map(|t| t.as_str()))
+                    })
+                    .await??,
+                ))
+            }
             Self::Remote(tx) => Ok(DatabaseAny::Remote(
                 tx.open_db(db.map(|t| t.to_string())).await?,
             )),
@@ -276,7 +298,16 @@ impl TransactionAny<RW> {
 
     pub async fn create_db(&self, db: Option<&str>, flags: DatabaseFlags) -> Result<DatabaseAny> {
         match self {
-            Self::Local(tx) => Ok(DatabaseAny::Local(tx.create_db(db, flags)?)),
+            Self::Local(tx) => {
+                let tx = tx.clone();
+                let db = db.map(|t| t.to_string());
+                Ok(DatabaseAny::Local(
+                    tokio::task::spawn_blocking(move || {
+                        tx.create_db(db.as_ref().map(|t| t.as_str()), flags)
+                    })
+                    .await??,
+                ))
+            }
             Self::Remote(tx) => Ok(DatabaseAny::Remote(
                 tx.create_db(db.map(|t| t.to_string()), flags).await?,
             )),
@@ -295,7 +326,7 @@ impl TransactionAny<RW> {
     }
     pub async fn commit(self) -> Result<(bool, CommitLatency)> {
         match self {
-            Self::Local(tx) => Ok(tx.commit()?),
+            Self::Local(tx) => Ok(tokio::task::spawn_blocking(move || tx.commit()).await??),
             Self::Remote(tx) => Ok(tx.commit().await?),
         }
     }

@@ -75,6 +75,14 @@ pub enum ClientError {
     IO(std::io::Error),
     #[error("Server error: {0}")]
     Server(ServerError),
+    #[error("Runtime error: {0}")]
+    Runtime(tokio::task::JoinError),
+}
+
+impl From<tokio::task::JoinError> for ClientError {
+    fn from(value: tokio::task::JoinError) -> Self {
+        Self::Runtime(value)
+    }
 }
 
 impl From<std::io::Error> for ClientError {
