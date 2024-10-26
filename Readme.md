@@ -79,6 +79,8 @@ This exactly mimics the output of `mdbx_stat` utility from `libmdbx`. Note the `
 - `max_dbs`: Max databases
 - `deadline`: The seconds to wait before giving up an RPC request
 
+It is also worth mentioning that, if the host part is empty, like `mdbx:///path/to/local/db`, it refers to a local MDBX database located at `/path/to/local/db`.
+
 ### Access Reth Database
 
 One of the motivation to build `mdbx-remote` is to access reth database. `mdbx reth` can get a value from one reth table.
