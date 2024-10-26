@@ -41,7 +41,8 @@ And stat any database with a url:
 # Stat a remote reth database
 cargo run --release stat mdbx://127.0.0.1/remote/path/to/db?ro=1
 # Or
-docker run --rm -it --env RUST_LOG=info --network host lazymio/mdbx-remote stat mdbx://127.0.0.1/remote/path/to/db?ro=1
+docker run --rm -it --env RUST_LOG=info --network host \
+    lazymio/mdbx-remote stat mdbx://127.0.0.1/remote/path/to/db?ro=1
 
 Database:
 	Page size: 4096
