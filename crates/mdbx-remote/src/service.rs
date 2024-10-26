@@ -389,7 +389,7 @@ impl RemoteMDBX for RemoteMDBXServer {
         let val = if let Some(tx) = env.rwtxs.get(&tx) {
             let tx = tx.tx.clone();
             drop(lg);
-            tokio::task::spawn_blocking(move || tx.get::<Vec<u8>>(dbi, &key)).await??
+            tx.get::<Vec<u8>>(dbi, &key)?
         } else if let Some(ro) = env.rotxs.get(&tx) {
             let tx_clone = ro.tx.clone();
             drop(lg);
