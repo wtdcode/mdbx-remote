@@ -2,12 +2,13 @@ name: Crates.io Distribution
 
 on:
   push:
-    - '**.rs'
-    - '**.toml'
-    - '**.lock'
-    - '**.yaml'
-    - 'Dockerfile'
-    - 'crates/mdbx-remote/mdbx-sys/libmdbx/**'
+    paths:
+      - '**.rs'
+      - '**.toml'
+      - '**.lock'
+      - '**.yaml'
+      - 'Dockerfile'
+      - 'crates/mdbx-remote/mdbx-sys/libmdbx/**'
 
 jobs:
   build:
