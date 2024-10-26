@@ -32,4 +32,4 @@ jobs:
         env:
           TOKEN: ${{ secrets.MDBX_CRATES_IO }}
         run: |
-          cargo login $TOKEN && cargo test && cargo publish
+          cargo login $TOKEN && cargo test && cargo publish -p libmdbx-remote
