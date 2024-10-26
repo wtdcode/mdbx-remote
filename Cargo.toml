@@ -30,6 +30,6 @@ rand = "0.8.5"
 tempfile = "3.8"
 criterion = "0.5"
 futures-util = "0.3"
-libmdbx-remote = {version = "0.1", path = "crates/mdbx-remote", default-features = false}
+libmdbx-remote = {version = "0.2", path = "crates/mdbx-remote", default-features = false}
 mdbx = {version = "0.1", path = "crates/mdbx", default-features = false}
-mdbx-remote-sys = {version = "0.1", path = "crates/mdbx-remote/mdbx-sys", default-features = false}
+mdbx-remote-sys = {version = "0.2", path = "crates/mdbx-remote/mdbx-sys", default-features = false}
