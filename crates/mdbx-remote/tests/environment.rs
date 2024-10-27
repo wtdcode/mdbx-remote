@@ -70,10 +70,25 @@ fn test_create_db() {
 
     let txn = env.begin_rw_txn().unwrap();
     assert!(txn.open_db(Some("testdb")).is_err());
-    assert!(txn
+    let dbi = txn
         .create_db(Some("testdb"), DatabaseFlags::empty())
-        .is_ok());
-    assert!(txn.open_db(Some("testdb")).is_ok())
+        .unwrap();
+
+    assert!(txn.open_db(Some("testdb")).is_ok());
+
+    txn.put(dbi.dbi(), &[1], &[2], WriteFlags::default())
+        .unwrap();
+
+    txn.commit().unwrap();
+    drop(dbi);
+
+    let txn = env.begin_rw_txn().unwrap();
+    let dbi = txn
+        .create_db(Some("testdb"), DatabaseFlags::empty())
+        .unwrap();
+    let val = txn.get::<Vec<u8>>(dbi.dbi(), &[1]).unwrap();
+
+    assert_eq!(val, Some(vec![2]));
 }
 
 #[test]
