@@ -620,7 +620,7 @@ pub struct RemoteEnvironmentConfig {
     pub(crate) log_level: Option<ffi::MDBX_log_level_t>,
     pub(crate) kind: EnvironmentKind,
     // handle_slow_readers: Option<HandleSlowReadersCallback>, // TODO
-    #[cfg(feature = "read-tx-timeouts")]
+    // #[cfg(feature = "read-tx-timeouts")]
     /// The maximum duration of a read transaction. If [None], but the `read-tx-timeout` feature is
     /// enabled, the default value of [`DEFAULT_MAX_READ_TRANSACTION_DURATION`] is used.
     pub(crate) max_read_transaction_duration: Option<read_transactions::MaxReadTransactionDuration>,
@@ -644,6 +644,8 @@ impl From<EnvironmentBuilder> for RemoteEnvironmentConfig {
             log_level: value.log_level,
             kind: value.kind,
             #[cfg(feature = "read-tx-timeouts")]
+            max_read_transaction_duration: value.max_read_transaction_duration,
+            #[cfg(not(feature = "read-tx-timeouts"))]
             max_read_transaction_duration: None,
         }
     }
@@ -674,7 +676,7 @@ impl From<RemoteEnvironmentConfig> for EnvironmentBuilder {
             kind: value.kind,
             handle_slow_readers: None,
             #[cfg(feature = "read-tx-timeouts")]
-            max_read_transaction_duration: None,
+            max_read_transaction_duration: value.max_read_transaction_duration,
         }
     }
 }
@@ -990,15 +992,14 @@ impl EnvironmentBuilder {
     }
 }
 
-#[cfg(feature = "read-tx-timeouts")]
 pub(crate) mod read_transactions {
+    #[cfg(feature = "read-tx-timeouts")]
     use crate::EnvironmentBuilder;
     use serde::{Deserialize, Serialize};
     use std::time::Duration;
 
     /// The maximum duration of a read transaction.
     #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-    #[cfg(feature = "read-tx-timeouts")]
     pub enum MaxReadTransactionDuration {
         /// The maximum duration of a read transaction is unbounded.
         Unbounded,
@@ -1016,6 +1017,7 @@ pub(crate) mod read_transactions {
         }
     }
 
+    #[cfg(feature = "read-tx-timeouts")]
     impl EnvironmentBuilder {
         /// Set the maximum time a read-only transaction can be open.
         pub fn set_max_read_transaction_duration(
