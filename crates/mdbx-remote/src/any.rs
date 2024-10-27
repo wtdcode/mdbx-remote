@@ -51,9 +51,9 @@ impl EnvironmentAny {
         Ok(Self::Remote(env))
     }
 
-    pub async fn open(url: &str) -> Result<Self> {
+    pub async fn open_with_defaults(url: &str, defaults: EnvironmentBuilder) -> Result<Self> {
         let url = url::Url::parse(url).map_err(|e| ClientError::WrongURL(e))?;
-        let mut builder = Environment::builder();
+        let mut builder = defaults;
 
         let args: HashMap<String, String> = url
             .query_pairs()
@@ -68,12 +68,24 @@ impl EnvironmentAny {
                 sync_mode: crate::SyncMode::Durable,
             }
         } else {
-            Mode::ReadOnly
+            builder.flags.mode.clone()
         };
 
-        let exclusive = args.contains_key("exclusive");
-        let accede = args.contains_key("accede");
-        let no_sub_dir = args.contains_key("no_sub_dir");
+        let exclusive = if args.contains_key("exclusive") {
+            true
+        } else {
+            builder.flags.exclusive
+        };
+        let accede = if args.contains_key("accede") {
+            true
+        } else {
+            builder.flags.accede
+        };
+        let no_sub_dir = if args.contains_key("no_sub_dir") {
+            true
+        } else {
+            builder.flags.no_sub_dir
+        };
         let flags = EnvironmentFlags {
             mode,
             exclusive,
@@ -87,31 +99,37 @@ impl EnvironmentAny {
             .map(|t| u64::from_str_radix(&t, 10))
             .transpose()
             .map_err(|_| ClientError::ParseError)?
-            .unwrap_or(256);
+            .or(builder.max_readers);
         let max_dbs = args
             .get("max_dbs")
             .map(|t| usize::from_str_radix(&t, 10))
             .transpose()
             .map_err(|_| ClientError::ParseError)?
-            .unwrap_or(256);
+            .or(builder.max_dbs.map(|t| t as usize));
         let sync_bytes = args
             .get("sync_bytes")
-            .map(|t| usize::from_str_radix(&t, 10))
+            .map(|t| u64::from_str_radix(&t, 10))
             .transpose()
-            .map_err(|_| ClientError::ParseError)?;
+            .map_err(|_| ClientError::ParseError)?
+            .or(builder.sync_bytes);
         let sync_period = args
             .get("sync_period")
             .map(|t| u64::from_str_radix(&t, 10))
             .transpose()
-            .map_err(|_| ClientError::ParseError)?;
+            .map_err(|_| ClientError::ParseError)?
+            .or(builder.sync_period);
 
-        builder
-            .set_flags(flags)
-            .set_max_dbs(max_dbs)
-            .set_max_readers(max_readers);
+        builder.set_flags(flags);
+        if let Some(max_db) = max_dbs {
+            builder.set_max_dbs(max_db);
+        }
+
+        if let Some(max_readers) = max_readers {
+            builder.set_max_readers(max_readers);
+        }
 
         if let Some(sync_bytes) = sync_bytes {
-            builder.set_sync_bytes(sync_bytes);
+            builder.set_sync_bytes(sync_bytes as usize);
         }
 
         if let Some(sync_period) = sync_period {
@@ -140,6 +158,18 @@ impl EnvironmentAny {
             }
             _ => Err(ClientError::ParseError),
         }
+    }
+
+    pub async fn open(url: &str) -> Result<Self> {
+        let mut defaults = Environment::builder();
+        defaults
+            .set_flags(EnvironmentFlags {
+                mode: Mode::ReadOnly,
+                ..Default::default()
+            })
+            .set_max_dbs(256)
+            .set_max_readers(256);
+        Self::open_with_defaults(url, defaults).await
     }
 
     pub async fn begin_ro_txn(&self) -> Result<TransactionAny<RO>> {

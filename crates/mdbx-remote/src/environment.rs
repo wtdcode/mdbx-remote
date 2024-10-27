@@ -605,25 +605,25 @@ pub enum HandleSlowReadersReturnCode {
 /// Options for opening or creating an _remote_ environment.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RemoteEnvironmentConfig {
-    flags: EnvironmentFlags,
-    max_readers: Option<u64>,
-    max_dbs: Option<u64>,
-    sync_bytes: Option<u64>,
-    sync_period: Option<u64>,
-    rp_augment_limit: Option<u64>,
-    loose_limit: Option<u64>,
-    dp_reserve_limit: Option<u64>,
-    txn_dp_limit: Option<u64>,
-    spill_max_denominator: Option<u64>,
-    spill_min_denominator: Option<u64>,
-    geometry: Option<Geometry<(Option<usize>, Option<usize>)>>,
-    log_level: Option<ffi::MDBX_log_level_t>,
-    kind: EnvironmentKind,
+    pub(crate) flags: EnvironmentFlags,
+    pub(crate) max_readers: Option<u64>,
+    pub(crate) max_dbs: Option<u64>,
+    pub(crate) sync_bytes: Option<u64>,
+    pub(crate) sync_period: Option<u64>,
+    pub(crate) rp_augment_limit: Option<u64>,
+    pub(crate) loose_limit: Option<u64>,
+    pub(crate) dp_reserve_limit: Option<u64>,
+    pub(crate) txn_dp_limit: Option<u64>,
+    pub(crate) spill_max_denominator: Option<u64>,
+    pub(crate) spill_min_denominator: Option<u64>,
+    pub(crate) geometry: Option<Geometry<(Option<usize>, Option<usize>)>>,
+    pub(crate) log_level: Option<ffi::MDBX_log_level_t>,
+    pub(crate) kind: EnvironmentKind,
     // handle_slow_readers: Option<HandleSlowReadersCallback>, // TODO
     #[cfg(feature = "read-tx-timeouts")]
     /// The maximum duration of a read transaction. If [None], but the `read-tx-timeout` feature is
     /// enabled, the default value of [`DEFAULT_MAX_READ_TRANSACTION_DURATION`] is used.
-    max_read_transaction_duration: Option<read_transactions::MaxReadTransactionDuration>,
+    pub(crate) max_read_transaction_duration: Option<read_transactions::MaxReadTransactionDuration>,
 }
 
 impl From<EnvironmentBuilder> for RemoteEnvironmentConfig {
@@ -682,25 +682,25 @@ impl From<RemoteEnvironmentConfig> for EnvironmentBuilder {
 /// Options for opening or creating an environment.
 #[derive(Debug, Clone)]
 pub struct EnvironmentBuilder {
-    flags: EnvironmentFlags,
-    max_readers: Option<u64>,
-    max_dbs: Option<u64>,
-    sync_bytes: Option<u64>,
-    sync_period: Option<u64>,
-    rp_augment_limit: Option<u64>,
-    loose_limit: Option<u64>,
-    dp_reserve_limit: Option<u64>,
-    txn_dp_limit: Option<u64>,
-    spill_max_denominator: Option<u64>,
-    spill_min_denominator: Option<u64>,
-    geometry: Option<Geometry<(Option<usize>, Option<usize>)>>,
-    log_level: Option<ffi::MDBX_log_level_t>,
-    kind: EnvironmentKind,
-    handle_slow_readers: Option<HandleSlowReadersCallback>,
+    pub(crate) flags: EnvironmentFlags,
+    pub(crate) max_readers: Option<u64>,
+    pub(crate) max_dbs: Option<u64>,
+    pub(crate) sync_bytes: Option<u64>,
+    pub(crate) sync_period: Option<u64>,
+    pub(crate) rp_augment_limit: Option<u64>,
+    pub(crate) loose_limit: Option<u64>,
+    pub(crate) dp_reserve_limit: Option<u64>,
+    pub(crate) txn_dp_limit: Option<u64>,
+    pub(crate) spill_max_denominator: Option<u64>,
+    pub(crate) spill_min_denominator: Option<u64>,
+    pub(crate) geometry: Option<Geometry<(Option<usize>, Option<usize>)>>,
+    pub(crate) log_level: Option<ffi::MDBX_log_level_t>,
+    pub(crate) kind: EnvironmentKind,
+    pub(crate) handle_slow_readers: Option<HandleSlowReadersCallback>,
     #[cfg(feature = "read-tx-timeouts")]
     /// The maximum duration of a read transaction. If [None], but the `read-tx-timeout` feature is
     /// enabled, the default value of [`DEFAULT_MAX_READ_TRANSACTION_DURATION`] is used.
-    max_read_transaction_duration: Option<read_transactions::MaxReadTransactionDuration>,
+    pub(crate) max_read_transaction_duration: Option<read_transactions::MaxReadTransactionDuration>,
 }
 
 impl EnvironmentBuilder {
