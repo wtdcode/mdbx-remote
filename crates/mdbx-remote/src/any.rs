@@ -1,5 +1,10 @@
 use std::{
-    collections::HashMap, net::SocketAddr, path::PathBuf, pin::Pin, str::FromStr, time::Duration,
+    collections::HashMap,
+    net::SocketAddr,
+    path::{Path, PathBuf},
+    pin::Pin,
+    str::FromStr,
+    time::Duration,
 };
 
 use async_stream::try_stream;
@@ -8,8 +13,9 @@ use tokio_stream::Stream;
 use crate::{
     remote::{ClientError, RemoteCursor, RemoteDatabase, RemoteEnvironment, RemoteTransaction},
     service::RemoteMDBXClient,
-    CommitLatency, Cursor, Database, DatabaseFlags, Environment, EnvironmentFlags, EnvironmentKind,
-    Info, Mode, Stat, TableObject, Transaction, TransactionKind, WriteFlags, RO, RW,
+    CommitLatency, Cursor, Database, DatabaseFlags, Environment, EnvironmentBuilder,
+    EnvironmentFlags, EnvironmentKind, Info, Mode, Stat, TableObject, Transaction, TransactionKind,
+    WriteFlags, RO, RW,
 };
 
 type Result<T> = std::result::Result<T, ClientError>;
@@ -21,6 +27,30 @@ pub enum EnvironmentAny {
 }
 
 impl EnvironmentAny {
+    pub fn open_local(path: &Path, builder: EnvironmentBuilder) -> Result<Self> {
+        let db = builder.open(path)?;
+
+        Ok(Self::Local(db))
+    }
+
+    pub async fn open_remote(
+        path: &Path,
+        builder: EnvironmentBuilder,
+        remote: String,
+        deadline: Duration,
+    ) -> Result<Self> {
+        let transport = tarpc::serde_transport::tcp::connect(
+            remote,
+            tarpc::tokio_serde::formats::Bincode::default,
+        )
+        .await?;
+        let client = RemoteMDBXClient::new(tarpc::client::Config::default(), transport);
+        let env =
+            RemoteEnvironment::open_with_builder(path.to_path_buf(), builder, client, deadline)
+                .await?;
+        Ok(Self::Remote(env))
+    }
+
     pub async fn open(url: &str) -> Result<Self> {
         let url = url::Url::parse(url).map_err(|e| ClientError::WrongURL(e))?;
         let mut builder = Environment::builder();
@@ -97,30 +127,15 @@ impl EnvironmentAny {
             .unwrap_or(Duration::from_secs(30));
 
         match url.scheme() {
-            "file" => {
-                let fpath = PathBuf::from(url.path());
-                let env = builder.open(&fpath)?;
-                Ok(Self::Local(env))
-            }
+            "file" => Self::open_local(&PathBuf::from(url.path()), builder),
             "mdbx" => {
                 let fpath = PathBuf::from(url.path());
                 if let Some(host) = url.host_str() {
                     let target = format!("{}:{}", host, url.port().unwrap_or(1899));
-                    let addr =
-                        SocketAddr::from_str(&target).map_err(|_| ClientError::ParseError)?;
-                    let transport = tarpc::serde_transport::tcp::connect(
-                        addr,
-                        tarpc::tokio_serde::formats::Bincode::default,
-                    )
-                    .await?;
-                    let client = RemoteMDBXClient::new(tarpc::client::Config::default(), transport);
-                    let env =
-                        RemoteEnvironment::open_with_builder(fpath, builder, client, deadline)
-                            .await?;
-                    Ok(Self::Remote(env))
+
+                    Self::open_remote(&fpath, builder, target, deadline).await
                 } else {
-                    let env = builder.open(&fpath)?;
-                    Ok(Self::Local(env))
+                    Self::open_local(&PathBuf::from(url.path()), builder)
                 }
             }
             _ => Err(ClientError::ParseError),
