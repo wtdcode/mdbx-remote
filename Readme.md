@@ -127,6 +127,7 @@ libmdbx-remote = "0.1"
 
 ## TODO
 
+- Batch cursor (taking a `self`) get/put to improve throughput
 - Implmenet more MDBX utilities, especially `mdbx_dump`.
 - Reach full parity with `libmdbx-rs`.
 - Reach more parity with `reth db` operations.
