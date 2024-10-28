@@ -173,8 +173,10 @@ pub struct RemoteMDBXServer {
 }
 
 impl RemoteMDBXServer {
-    pub fn new(state: Arc<RwLock<MDBXServerState>>) -> Self {
-        Self { state: state }
+    pub fn new() -> Self {
+        Self {
+            state: Arc::new(RwLock::new(MDBXServerState::default())),
+        }
     }
 }
 

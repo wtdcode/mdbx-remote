@@ -13,11 +13,9 @@ pub async fn remote_env() -> (TempDir, EnvironmentAny) {
     let dir = tempdir().unwrap();
     let (cl, sv) = tarpc::transport::channel::unbounded();
     let server = tarpc::server::BaseChannel::with_defaults(sv);
-    let state = Arc::new(RwLock::new(MDBXServerState::default()));
 
     tokio::spawn(async move {
-        let state = state;
-        let mut st = Box::pin(server.execute(RemoteMDBXServer::new(state.clone()).serve()));
+        let mut st = Box::pin(server.execute(RemoteMDBXServer::new().serve()));
         while let Some(res) = st.next().await {
             tokio::spawn(res);
         }
