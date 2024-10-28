@@ -1,10 +1,9 @@
-use std::{net::SocketAddr, sync::Arc, usize};
+use std::{net::SocketAddr, usize};
 
 use clap::Args;
 use color_eyre::Result;
-use libmdbx_remote::{MDBXServerState, RemoteMDBX, RemoteMDBXServer};
+use libmdbx_remote::{RemoteMDBX, RemoteMDBXServer};
 use tarpc::server::Channel;
-use tokio::sync::RwLock;
 use tokio_stream::StreamExt;
 
 #[derive(Args)]

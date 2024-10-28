@@ -1,12 +1,10 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
 use libmdbx_remote::{
-    Environment, EnvironmentAny, MDBXServerState, RemoteEnvironment, RemoteMDBX, RemoteMDBXClient,
-    RemoteMDBXServer,
+    Environment, EnvironmentAny, RemoteEnvironment, RemoteMDBX, RemoteMDBXClient, RemoteMDBXServer,
 };
 use tarpc::server::Channel;
 use tempfile::{tempdir, TempDir};
-use tokio::sync::RwLock;
 use tokio_stream::StreamExt;
 
 pub async fn remote_env() -> (TempDir, EnvironmentAny) {
