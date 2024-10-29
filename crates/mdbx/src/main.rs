@@ -1,8 +1,10 @@
 use clap::{Parser, Subcommand};
 use color_eyre::Result;
+use dump::{mdbx_dump, DumpArguments};
 use reth::{reth_main, RethArguments};
 use server::{server_main, ServerArguments};
 use stat::{stat_main, StatArguments};
+mod dump;
 mod reth;
 mod server;
 mod stat;
@@ -12,6 +14,7 @@ enum MDBXCommand {
     Stat(StatArguments),
     Server(ServerArguments),
     Reth(RethArguments),
+    Dump(DumpArguments),
 }
 
 #[derive(Parser)]
@@ -27,6 +30,7 @@ async fn main_entry() -> Result<()> {
         MDBXCommand::Server(args) => server_main(args).await,
         MDBXCommand::Stat(args) => stat_main(args).await,
         MDBXCommand::Reth(args) => reth_main(args).await,
+        MDBXCommand::Dump(args) => mdbx_dump(args).await,
     }
 }
 
