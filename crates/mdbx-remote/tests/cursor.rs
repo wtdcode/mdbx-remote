@@ -220,15 +220,94 @@ async fn test_iter(env: EnvironmentAny) {
     assert_eq!(items, retr);
 
     cursor.set::<()>(b"key2").await.unwrap();
+    // cnt variant
+    assert_eq!(
+        items.clone().into_iter().skip(2).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_cnt(64)
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    assert_eq!(
+        items.clone().into_iter().skip(2).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_cnt(1)
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
     assert_eq!(
         items.clone().into_iter().skip(2).collect::<Vec<_>>(),
         cursor.iter().map(|t| t.unwrap()).collect::<Vec<_>>().await
+    );
+
+    // cnt variant
+    assert_eq!(
+        items,
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_start_cnt(1)
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    assert_eq!(
+        items,
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_start_cnt(64)
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
     );
 
     assert_eq!(
         items,
         cursor
             .iter_start()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    // cnt variant
+    assert_eq!(
+        items.clone().into_iter().skip(1).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_from_cnt(b"key2", 1)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    assert_eq!(
+        items.clone().into_iter().skip(1).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_from_cnt(b"key2", 64)
+            .await
+            .unwrap()
             .map(|t| t.unwrap())
             .collect::<Vec<_>>()
             .await
@@ -245,10 +324,79 @@ async fn test_iter(env: EnvironmentAny) {
             .await
     );
 
+    // cnt variant
+    assert_eq!(
+        items.clone().into_iter().skip(3).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_from_cnt(b"key4", 64)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    assert_eq!(
+        items.clone().into_iter().skip(3).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_from_cnt(b"key4", 1)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
     assert_eq!(
         items.into_iter().skip(3).collect::<Vec<_>>(),
         cursor
             .iter_from(b"key4")
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    // cnt variant
+    assert_eq!(
+        Vec::<((), ())>::new(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_from_cnt(b"key6", 1)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    assert_eq!(
+        Vec::<((), ())>::new(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_from_cnt(b"key6", 64)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    assert_eq!(
+        Vec::<((), ())>::new(),
+        cursor
+            .iter_from(b"key6")
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -273,8 +421,34 @@ async fn test_iter_empty_database(env: EnvironmentAny) {
     let db = txn.open_db(None).await.unwrap();
     let mut cursor = txn.cursor(&db).await.unwrap();
 
+    assert!(cursor
+        .cursor_clone()
+        .await
+        .unwrap()
+        .into_iter_cnt::<(), ()>(64)
+        .next()
+        .await
+        .is_none());
     assert!(cursor.iter::<(), ()>().next().await.is_none());
+    assert!(cursor
+        .cursor_clone()
+        .await
+        .unwrap()
+        .into_iter_start_cnt::<(), ()>(64)
+        .next()
+        .await
+        .is_none());
     assert!(cursor.iter_start::<(), ()>().next().await.is_none());
+    assert!(cursor
+        .cursor_clone()
+        .await
+        .unwrap()
+        .into_iter_from_cnt::<(), ()>(b"foo", 64)
+        .await
+        .unwrap()
+        .next()
+        .await
+        .is_none());
     assert!(cursor
         .iter_from::<(), ()>(b"foo")
         .await
@@ -293,8 +467,34 @@ async fn test_iter_empty_dup_database(env: EnvironmentAny) {
     let db = txn.open_db(None).await.unwrap();
     let mut cursor = txn.cursor(&db).await.unwrap();
 
+    assert!(cursor
+        .cursor_clone()
+        .await
+        .unwrap()
+        .into_iter_cnt::<(), ()>(64)
+        .next()
+        .await
+        .is_none());
     assert!(cursor.iter::<(), ()>().next().await.is_none());
+    assert!(cursor
+        .cursor_clone()
+        .await
+        .unwrap()
+        .into_iter_start_cnt::<(), ()>(64)
+        .next()
+        .await
+        .is_none());
     assert!(cursor.iter_start::<(), ()>().next().await.is_none());
+    assert!(cursor
+        .cursor_clone()
+        .await
+        .unwrap()
+        .into_iter_from_cnt::<(), ()>(b"foo", 64)
+        .await
+        .unwrap()
+        .next()
+        .await
+        .is_none());
     assert!(cursor
         .iter_from::<(), ()>(b"foo")
         .await
@@ -311,7 +511,27 @@ async fn test_iter_empty_dup_database(env: EnvironmentAny) {
         .is_none());
 
     assert!(cursor
+        .cursor_clone()
+        .await
+        .unwrap()
+        .into_iter_dup_cnt::<(), ()>(64)
+        .map(|t| t.unwrap())
+        .flatten()
+        .next()
+        .await
+        .is_none());
+    assert!(cursor
         .iter_dup::<(), ()>()
+        .map(|t| t.unwrap())
+        .flatten()
+        .next()
+        .await
+        .is_none());
+    assert!(cursor
+        .cursor_clone()
+        .await
+        .unwrap()
+        .into_iter_dup_start_cnt::<(), ()>(64)
         .map(|t| t.unwrap())
         .flatten()
         .next()
@@ -325,11 +545,33 @@ async fn test_iter_empty_dup_database(env: EnvironmentAny) {
         .await
         .is_none());
     assert!(cursor
+        .cursor_clone()
+        .await
+        .unwrap()
+        .into_iter_dup_from_cnt::<(), ()>(b"foo", 64)
+        .await
+        .unwrap()
+        .map(|t| t.unwrap())
+        .flatten()
+        .next()
+        .await
+        .is_none());
+    assert!(cursor
         .iter_dup_from::<(), ()>(b"foo")
         .await
         .unwrap()
         .map(|t| t.unwrap())
         .flatten()
+        .next()
+        .await
+        .is_none());
+    assert!(cursor
+        .cursor_clone()
+        .await
+        .unwrap()
+        .into_iter_dup_of_cnt::<(), ()>(b"foo", 64)
+        .await
+        .unwrap()
         .next()
         .await
         .is_none());
@@ -382,6 +624,34 @@ async fn test_iter_dup(env: EnvironmentAny) {
     let txn = env.begin_ro_txn().await.unwrap();
     let db = txn.open_db(None).await.unwrap();
     let mut cursor = txn.cursor(&db).await.unwrap();
+    // cnt variant
+    assert_eq!(
+        items,
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_cnt(1)
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+    assert_eq!(
+        items,
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_cnt(64)
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
     assert_eq!(
         items,
         cursor
@@ -393,13 +663,67 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .await
     );
 
-    // panic!("");
-
     cursor.set::<()>(b"b").await.unwrap();
+    // cnt variant
+    assert_eq!(
+        items.iter().copied().skip(4).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_cnt(1)
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+    assert_eq!(
+        items.iter().copied().skip(4).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_cnt(64)
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
     assert_eq!(
         items.iter().copied().skip(4).collect::<Vec<_>>(),
         cursor
             .iter_dup()
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    // cnt variant
+    assert_eq!(
+        items,
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_start_cnt(1)
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+    assert_eq!(
+        items,
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_start_cnt(64)
             .map(|t| t.unwrap())
             .flatten()
             .map(|t| t.unwrap())
@@ -418,10 +742,75 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .await
     );
 
+    // cnt variant
+    assert_eq!(
+        items.iter().copied().skip(3).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_from_cnt(b"b", 1)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+    assert_eq!(
+        items.iter().copied().skip(3).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_from_cnt(b"b", 64)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
     assert_eq!(
         items.iter().copied().skip(3).collect::<Vec<_>>(),
         cursor
             .iter_dup_from(b"b")
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    // cnt variant
+    assert_eq!(
+        items.iter().copied().skip(3).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_from_cnt(b"ab", 1)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    assert_eq!(
+        items.iter().copied().skip(3).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_from_cnt(b"ab", 64)
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -444,10 +833,76 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .await
     );
 
+    // cnt variant
+    assert_eq!(
+        items.iter().copied().skip(9).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_from_cnt(b"d", 64)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    assert_eq!(
+        items.iter().copied().skip(9).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_from_cnt(b"d", 1)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
     assert_eq!(
         items.iter().copied().skip(9).collect::<Vec<_>>(),
         cursor
             .iter_dup_from(b"d")
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    // cnt variant
+    assert_eq!(
+        Vec::<([u8; 1], [u8; 1])>::new(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_from_cnt(b"f", 1)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    assert_eq!(
+        Vec::<([u8; 1], [u8; 1])>::new(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_from_cnt(b"f", 64)
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -470,6 +925,35 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .await
     );
 
+    // cnt variant
+    assert_eq!(
+        items.iter().copied().skip(3).take(3).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_of_cnt(b"b", 1)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    assert_eq!(
+        items.iter().copied().skip(3).take(3).collect::<Vec<_>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_of_cnt(b"b", 64)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
     assert_eq!(
         items.iter().copied().skip(3).take(3).collect::<Vec<_>>(),
         cursor
@@ -481,6 +965,32 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .await
     );
 
+    // cnt variant
+    assert_eq!(
+        0,
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_of_cnt::<(), ()>(b"foo", 1)
+            .await
+            .unwrap()
+            .count()
+            .await
+    );
+
+    assert_eq!(
+        0,
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_of_cnt::<(), ()>(b"foo", 64)
+            .await
+            .unwrap()
+            .count()
+            .await
+    );
     assert_eq!(
         0,
         cursor
@@ -527,12 +1037,69 @@ async fn test_iter_del_get(env: EnvironmentAny) {
     let txn = env.begin_rw_txn().await.unwrap();
     let db = txn.open_db(None).await.unwrap();
     let mut cursor = txn.cursor(&db).await.unwrap();
+    // cnt variant
+    assert_eq!(
+        items,
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_cnt(1)
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    assert_eq!(
+        items,
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_cnt(64)
+            .map(|t| t.unwrap())
+            .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
     assert_eq!(
         items,
         cursor
             .iter_dup()
             .map(|t| t.unwrap())
             .flatten()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+
+    // cnt variant
+    assert_eq!(
+        items.iter().copied().take(1).collect::<Vec<(_, _)>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_of_cnt(b"a", 1)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+    );
+    assert_eq!(
+        items.iter().copied().take(1).collect::<Vec<(_, _)>>(),
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_of_cnt(b"a", 64)
+            .await
+            .unwrap()
             .map(|t| t.unwrap())
             .collect::<Vec<_>>()
             .await
@@ -552,6 +1119,37 @@ async fn test_iter_del_get(env: EnvironmentAny) {
     assert_eq!(cursor.set(b"a").await.unwrap(), Some(*b"1"));
 
     cursor.del(WriteFlags::empty()).await.unwrap();
+
+    // cnt variant
+    assert_eq!(
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_of_cnt::<(), ()>(b"a", 1)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+            .len(),
+        0
+    );
+
+    assert_eq!(
+        cursor
+            .cursor_clone()
+            .await
+            .unwrap()
+            .into_iter_dup_of_cnt::<(), ()>(b"a", 64)
+            .await
+            .unwrap()
+            .map(|t| t.unwrap())
+            .collect::<Vec<_>>()
+            .await
+            .len(),
+        0
+    );
 
     assert_eq!(
         cursor

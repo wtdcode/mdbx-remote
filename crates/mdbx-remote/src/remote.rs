@@ -818,6 +818,90 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Ok(Some((found, k.unwrap(), v)))
     }
 
+    fn stream_iter_cnt<'a, Key: TableObject + Send + 'a, Value: TableObject + Send + 'a>(
+        inner: Arc<RemoteCursorInner<K>>,
+        op: u32,
+        next_op: u32,
+        cnt: u64,
+    ) -> Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>> {
+        let st = try_stream! {
+            let cur = inner;
+
+            let ret = match cur.tx.env.cl.cur_get(cur.tx.env.context(), cur.tx.env.handle, cur.tx.handle, cur.handle, None, None, op).await? {
+                Ok(v) => {
+                    let k = Key::decode(&v.0.unwrap_or(Vec::new()))?;
+                    let v = Value::decode(&v.1)?;
+
+                    Ok(Some((k, v)))
+                },
+                Err(ServerError::MBDX(crate::Error::NoData | crate::Error::NotFound)) => Ok(None),
+                Err(e) => {
+                    Err(ClientError::from(e))
+                }
+            };
+
+            let ret = ret?;
+            if let Some(ret) = ret {
+                yield ret;
+
+                loop {
+                    let vals = cur.tx.env.cl.batch_cur_get_full(cur.tx.env.context(), cur.tx.env.handle, cur.tx.handle, cur.handle, cnt, next_op).await??;
+
+                    let rt_size = vals.len() as u64;
+                    for (k, v) in vals.into_iter() {
+                        let k = Key::decode(&k)?;
+                        let v = Value::decode(&v)?;
+
+                        yield (k, v);
+                    }
+
+                    if rt_size < cnt || rt_size == 0 {
+                        break;
+                    }
+                }
+            }
+
+        };
+
+        Box::pin(st)
+    }
+
+    fn stream_iter_dup_cnt<'a, Key: TableObject + Send + 'a, Value: TableObject + Send + 'a>(
+        inner: Arc<RemoteCursorInner<K>>,
+        op: u32,
+        cnt: u64,
+    ) -> Pin<
+        Box<
+            dyn Stream<Item = Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>>
+                + Send
+                + 'a,
+        >,
+    > {
+        let st = try_stream! {
+            let cur = inner;
+            let mut op = op;
+            loop {
+                let op = std::mem::replace(&mut op, MDBX_NEXT_NODUP);
+
+                let ret = match cur.tx.env.cl.cur_get(cur.tx.env.context(), cur.tx.env.handle, cur.tx.handle, cur.handle, None, None, op).await? {
+                    Ok(_) => {
+                        let new_cur = cur.cur_clone().await?;
+                        Ok(Self::stream_iter_cnt::<'a, Key, Value>(Arc::new(new_cur), MDBX_GET_CURRENT, MDBX_NEXT_DUP, cnt))
+                    },
+                    Err(ServerError::MBDX(crate::Error::NoData | crate::Error::NotFound)) => break,
+                    Err(e) => {
+                        Err(ClientError::from(e))
+                    }
+                };
+
+                let ret = ret?;
+                yield ret;
+            }
+        };
+
+        Box::pin(st)
+    }
+
     fn stream_iter<'a, Key: TableObject + Send + 'a, Value: TableObject + Send + 'a>(
         inner: Arc<RemoteCursorInner<K>>,
         op: u32,
@@ -867,7 +951,6 @@ impl<K: TransactionKind> RemoteCursor<K> {
             loop {
                 let op = std::mem::replace(&mut op, MDBX_NEXT_NODUP);
 
-                tracing::info!("iter_dup_stream cur_get");
                 let ret = match cur.tx.env.cl.cur_get(cur.tx.env.context(), cur.tx.env.handle, cur.tx.handle, cur.handle, None, None, op).await? {
                     Ok(_) => {
                         let new_cur = cur.cur_clone().await?;
@@ -897,6 +980,17 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Self::stream_iter(self.inner.clone(), MDBX_NEXT, MDBX_NEXT)
     }
 
+    pub fn into_iter_cnt<'a, Key, Value>(
+        self,
+        cnt: u64,
+    ) -> Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        Self::stream_iter_cnt(self.inner.clone(), MDBX_NEXT, MDBX_NEXT, cnt)
+    }
+
     pub fn iter_start<'a, Key, Value>(
         &'a mut self,
     ) -> Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>
@@ -905,6 +999,17 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Value: TableObject + Send + 'a,
     {
         Self::stream_iter(self.inner.clone(), MDBX_FIRST, MDBX_NEXT)
+    }
+
+    pub fn into_iter_start_cnt<'a, Key, Value>(
+        self,
+        cnt: u64,
+    ) -> Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        Self::stream_iter_cnt(self.inner.clone(), MDBX_FIRST, MDBX_NEXT, cnt)
     }
 
     pub async fn iter_from<'a, Key, Value>(
@@ -924,6 +1029,25 @@ impl<K: TransactionKind> RemoteCursor<K> {
         ))
     }
 
+    pub async fn into_iter_from_cnt<'a, Key, Value>(
+        mut self,
+        key: Vec<u8>,
+        cnt: u64,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        let _ = self.set_range::<(), ()>(key).await?;
+
+        Ok(Self::stream_iter_cnt(
+            self.inner.clone(),
+            MDBX_GET_CURRENT,
+            MDBX_NEXT,
+            cnt,
+        ))
+    }
+
     pub fn iter_dup<'a, Key, Value>(
         &'a mut self,
     ) -> Pin<
@@ -940,6 +1064,23 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Self::stream_iter_dup(self.inner.clone(), MDBX_NEXT)
     }
 
+    pub fn into_iter_dup_cnt<'a, Key, Value>(
+        self,
+        cnt: u64,
+    ) -> Pin<
+        Box<
+            dyn Stream<Item = Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>>
+                + Send
+                + 'a,
+        >,
+    >
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        Self::stream_iter_dup_cnt(self.inner.clone(), MDBX_NEXT, cnt)
+    }
+
     pub fn iter_dup_start<'a, Key, Value>(
         &'a mut self,
     ) -> Pin<
@@ -954,6 +1095,23 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Value: TableObject + Send + 'a,
     {
         Self::stream_iter_dup(self.inner.clone(), MDBX_FIRST)
+    }
+
+    pub fn into_iter_dup_start_cnt<'a, Key, Value>(
+        self,
+        cnt: u64,
+    ) -> Pin<
+        Box<
+            dyn Stream<Item = Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>>
+                + Send
+                + 'a,
+        >,
+    >
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        Self::stream_iter_dup_cnt(self.inner.clone(), MDBX_FIRST, cnt)
     }
 
     pub async fn iter_dup_from<'a, Key, Value>(
@@ -979,6 +1137,34 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Ok(Self::stream_iter_dup(self.inner.clone(), MDBX_GET_CURRENT))
     }
 
+    pub async fn into_iter_dup_from_cnt<'a, Key, Value>(
+        mut self,
+        key: Vec<u8>,
+        cnt: u64,
+    ) -> Result<
+        Pin<
+            Box<
+                dyn Stream<
+                        Item = Result<
+                            Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>,
+                        >,
+                    > + Send
+                    + 'a,
+            >,
+        >,
+    >
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        let _ = self.set_range::<(), ()>(key).await?;
+        Ok(Self::stream_iter_dup_cnt(
+            self.inner.clone(),
+            MDBX_GET_CURRENT,
+            cnt,
+        ))
+    }
+
     pub async fn iter_dup_of<'a, Key, Value>(
         &'a mut self,
         key: Vec<u8>,
@@ -997,6 +1183,33 @@ impl<K: TransactionKind> RemoteCursor<K> {
         } else {
             let _ = self.last::<(), ()>().await?;
             Ok(Self::stream_iter(self.inner.clone(), MDBX_NEXT, MDBX_NEXT))
+        }
+    }
+
+    pub async fn into_iter_dup_of_cnt<'a, Key, Value>(
+        mut self,
+        key: Vec<u8>,
+        cnt: u64,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        let res = self.set::<()>(key).await?;
+        if let Some(_) = res {
+            Ok(Self::stream_iter(
+                self.inner.clone(),
+                MDBX_GET_CURRENT,
+                MDBX_NEXT_DUP,
+            ))
+        } else {
+            let _ = self.last::<(), ()>().await?;
+            Ok(Self::stream_iter_cnt(
+                self.inner.clone(),
+                MDBX_NEXT,
+                MDBX_NEXT,
+                cnt,
+            ))
         }
     }
 }

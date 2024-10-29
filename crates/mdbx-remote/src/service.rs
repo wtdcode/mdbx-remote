@@ -1,5 +1,10 @@
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
+use ffi::{
+    MDBX_FIRST, MDBX_GET_CURRENT, MDBX_LAST, MDBX_NEXT, MDBX_NEXT_DUP, MDBX_NEXT_MULTIPLE,
+    MDBX_NEXT_NODUP, MDBX_PREV, MDBX_PREV_DUP, MDBX_PREV_MULTIPLE, MDBX_PREV_NODUP, MDBX_SET_KEY,
+    MDBX_SET_RANGE,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::sync::RwLock;
@@ -8,6 +13,22 @@ use crate::{
     environment::RemoteEnvironmentConfig, CommitLatency, Cursor, DatabaseFlags, Environment,
     EnvironmentBuilder, Info, Stat, Transaction, TransactionKind, WriteFlags, RO, RW,
 };
+
+const ALLOWED_GET_FULL_OPS: &[u32] = &[
+    MDBX_NEXT,
+    MDBX_NEXT_DUP,
+    MDBX_NEXT_MULTIPLE,
+    MDBX_NEXT_NODUP,
+    MDBX_PREV,
+    MDBX_PREV_DUP,
+    MDBX_PREV_NODUP,
+    MDBX_PREV_MULTIPLE,
+    MDBX_FIRST,
+    MDBX_GET_CURRENT,
+    MDBX_LAST,
+    MDBX_SET_KEY,
+    MDBX_SET_RANGE,
+];
 
 #[tarpc::service]
 pub trait RemoteMDBX {
@@ -74,6 +95,15 @@ pub trait RemoteMDBX {
     async fn cur_create(env: u64, tx: u64, cur: u64) -> Result<u64, ServerError>;
     async fn cur_del(env: u64, tx: u64, cur: u64, flags: u32) -> Result<(), ServerError>;
     async fn cur_close(env: u64, tx: u64, cur: u64) -> Result<(), ServerError>;
+
+    // Our custom primitives
+    async fn batch_cur_get_full(
+        env: u64,
+        tx: u64,
+        cur: u64,
+        cnt: u64,
+        op: u32,
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, ServerError>;
 }
 
 #[derive(Debug)]
@@ -153,6 +183,8 @@ pub enum ServerError {
     NOWRITABLE,
     #[error("tokio: {0}")]
     TOKIO(String),
+    #[error("invalid get_full: {0}")]
+    INVALIDGETULL(u32),
 }
 
 impl From<tokio::task::JoinError> for ServerError {
@@ -797,5 +829,61 @@ impl RemoteMDBX for RemoteMDBXServer {
         }
 
         Ok(())
+    }
+
+    async fn batch_cur_get_full(
+        self,
+        _context: tarpc::context::Context,
+        env: u64,
+        tx: u64,
+        cur: u64,
+        cnt: u64,
+        op: u32,
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, ServerError> {
+        let op = mdbx_remote_sys::MDBX_cursor_op::try_from(op)
+            .map_err(|_| crate::error::Error::DecodeError)?;
+
+        if !ALLOWED_GET_FULL_OPS.contains(&op) {
+            return Err(ServerError::INVALIDGETULL(op));
+        }
+        let lg: tokio::sync::RwLockReadGuard<'_, MDBXServerState> = self.state.read().await;
+
+        let env = lg.envs.get(&env).ok_or(ServerError::NOENV)?;
+
+        // tracing::debug!("Cursor get, cur = {}, key = {:?} op = {}", cur, key, op);
+        if let Some(tx) = env.rwtxs.get(&tx) {
+            let cur = tx.cursors.get(&cur).ok_or(ServerError::NOCURSOR)?;
+
+            return Self::batch_cur_get_full_impl(cur, cnt, op);
+        } else if let Some(tx) = env.rotxs.get(&tx) {
+            let cur = tx.cursors.get(&cur).ok_or(ServerError::NOCURSOR)?;
+            return Self::batch_cur_get_full_impl(cur, cnt, op);
+        } else {
+            return Err(ServerError::NOTX);
+        }
+    }
+}
+
+impl RemoteMDBXServer {
+    fn batch_cur_get_full_impl<K: TransactionKind>(
+        cur: &Cursor<K>,
+        cnt: u64,
+        op: u32,
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, ServerError> {
+        let mut out = Vec::with_capacity(cnt as usize);
+        for _ in 0..cnt {
+            match cur.get::<Vec<u8>, Vec<u8>>(None, None, op) {
+                Ok((k, v, _)) => {
+                    let key = k.ok_or(ServerError::INVALIDGETULL(op))?;
+                    out.push((key, v));
+                }
+                Err(crate::Error::NoData | crate::Error::NotFound) => return Ok(out),
+                Err(e) => {
+                    return Err(e.into());
+                }
+            }
+        }
+
+        Ok(out)
     }
 }

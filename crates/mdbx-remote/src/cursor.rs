@@ -391,6 +391,14 @@ where
         IterDup::new(self, ffi::MDBX_NEXT)
     }
 
+    pub fn into_iter_dup<Key, Value>(&self) -> IntoIterDup<'_, K, Key, Value>
+    where
+        Key: TableObject,
+        Value: TableObject,
+    {
+        IntoIterDup::new(self.clone(), ffi::MDBX_NEXT)
+    }
+
     /// Iterate over duplicate database items starting from the beginning of the
     /// database. Each item will be returned as an iterator of its duplicates.
     pub fn iter_dup_start<Key, Value>(&mut self) -> IterDup<'_, K, Key, Value>
@@ -399,6 +407,14 @@ where
         Value: TableObject,
     {
         IterDup::new(self, ffi::MDBX_FIRST)
+    }
+
+    pub fn into_iter_dup_start<Key, Value>(&self) -> IntoIterDup<'_, K, Key, Value>
+    where
+        Key: TableObject,
+        Value: TableObject,
+    {
+        IntoIterDup::new(self.clone(), ffi::MDBX_FIRST)
     }
 
     /// Iterate over duplicate items in the database starting from the given
@@ -413,6 +429,18 @@ where
             return IterDup::Err(Some(error));
         };
         IterDup::new(self, ffi::MDBX_GET_CURRENT)
+    }
+
+    pub fn into_iter_dup_from<Key, Value>(&mut self, key: &[u8]) -> IntoIterDup<'_, K, Key, Value>
+    where
+        Key: TableObject,
+        Value: TableObject,
+    {
+        let res: Result<Option<((), ())>> = self.set_range(key);
+        if let Err(error) = res {
+            return IntoIterDup::Err(Some(error));
+        };
+        IntoIterDup::new(self.clone(), ffi::MDBX_GET_CURRENT)
     }
 
     /// Iterate over the duplicates of the item in the database with the given key.
@@ -431,6 +459,23 @@ where
             Err(error) => return Iter::Err(Some(error)),
         };
         Iter::new(self, ffi::MDBX_GET_CURRENT, ffi::MDBX_NEXT_DUP)
+    }
+
+    pub fn into_iter_dup_of<Key, Value>(&mut self, key: &[u8]) -> IntoIter<'_, K, Key, Value>
+    where
+        Key: TableObject,
+        Value: TableObject,
+    {
+        let res: Result<Option<()>> = self.set(key);
+        match res {
+            Ok(Some(_)) => (),
+            Ok(None) => {
+                let _: Result<Option<((), ())>> = self.last();
+                return IntoIter::new(self.clone(), ffi::MDBX_NEXT, ffi::MDBX_NEXT);
+            }
+            Err(error) => return IntoIter::Err(Some(error)),
+        };
+        IntoIter::new(self.clone(), ffi::MDBX_GET_CURRENT, ffi::MDBX_NEXT_DUP)
     }
 }
 
@@ -838,6 +883,115 @@ where
                 }
             }
             IterDup::Err(err) => err.take().map(|e| IntoIter::Err(Some(e))),
+        }
+    }
+}
+
+/// An iterator over the keys and duplicate values in an MDBX database.
+///
+/// The yielded items of the iterator are themselves iterators over the duplicate values for a
+/// specific key.
+///
+/// Note:
+/// This difference has totally diference variance in 'cur compared to IterDup. Since we no longer
+/// hold a reference, the 'cur is contravariant here and thus IntoIterDup<'cur> shall live shorter
+/// than 'cur. Reference: https://doc.rust-lang.org/reference/subtyping.html#variance
+/// Sidenote: IterDup<'cur> shall have invariance in 'cur
+pub enum IntoIterDup<'cur, K, Key, Value>
+where
+    K: TransactionKind,
+    Key: TableObject,
+    Value: TableObject,
+{
+    /// An iterator that returns an error on every call to `Iter.next()`.
+    /// Cursor.iter*() creates an Iter of this type when MDBX returns an error
+    /// on retrieval of a cursor.  Using this variant instead of returning
+    /// an error makes `Cursor.iter()`* methods infallible, so consumers only
+    /// need to check the result of `Iter.next()`.
+    Err(Option<Error>),
+
+    /// An iterator that returns an Item on calls to `Iter.next()`.
+    /// The Item is a Result<(&'txn [u8], &'txn [u8])>, so this variant
+    /// might still return an error, if retrieval of the key/value pair
+    /// fails for some reason.
+    Ok {
+        /// The MDBX cursor with which to iterate.
+        cursor: Cursor<K>,
+
+        /// The first operation to perform when the consumer calls `Iter.next()`.
+        op: MDBX_cursor_op,
+
+        _marker: PhantomData<fn(&'cur (Key, Value))>,
+    },
+}
+
+impl<'cur, K, Key, Value> IntoIterDup<'cur, K, Key, Value>
+where
+    K: TransactionKind,
+    Key: TableObject,
+    Value: TableObject,
+{
+    /// Creates a new iterator backed by the given cursor.
+    fn new(cursor: Cursor<K>, op: MDBX_cursor_op) -> Self {
+        IntoIterDup::Ok {
+            cursor: cursor,
+            op,
+            _marker: Default::default(),
+        }
+    }
+}
+
+impl<K, Key, Value> fmt::Debug for IntoIterDup<'_, K, Key, Value>
+where
+    K: TransactionKind,
+    Key: TableObject,
+    Value: TableObject,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("IterDup").finish()
+    }
+}
+
+impl<'cur, K, Key, Value> Iterator for IntoIterDup<'cur, K, Key, Value>
+where
+    K: TransactionKind,
+    Key: TableObject,
+    Value: TableObject,
+{
+    type Item = IntoIter<'cur, K, Key, Value>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            IntoIterDup::Ok { cursor, op, .. } => {
+                let mut key = ffi::MDBX_val {
+                    iov_len: 0,
+                    iov_base: ptr::null_mut(),
+                };
+                let mut data = ffi::MDBX_val {
+                    iov_len: 0,
+                    iov_base: ptr::null_mut(),
+                };
+                let op = mem::replace(op, ffi::MDBX_NEXT_NODUP);
+
+                let result = cursor.txn.txn_execute(|_| {
+                    let err_code =
+                        unsafe { ffi::mdbx_cursor_get(cursor.cursor(), &mut key, &mut data, op) };
+
+                    (err_code == ffi::MDBX_SUCCESS).then(|| {
+                        IntoIter::new(
+                            Cursor::new_at_position(&*cursor).unwrap(),
+                            ffi::MDBX_GET_CURRENT,
+                            ffi::MDBX_NEXT_DUP,
+                        )
+                    })
+                });
+
+                match result {
+                    Ok(result) => result,
+                    Err(err) => Some(IntoIter::Err(Some(err))),
+                }
+            }
+            IntoIterDup::Err(err) => err.take().map(|e| IntoIter::Err(Some(e))),
         }
     }
 }

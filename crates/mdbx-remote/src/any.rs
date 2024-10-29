@@ -382,6 +382,13 @@ pub enum CursorAny<K: TransactionKind> {
 }
 
 impl<K: TransactionKind> CursorAny<K> {
+    pub async fn cursor_clone(&self) -> Result<Self> {
+        match self {
+            Self::Local(cur) => Ok(Self::Local(cur.clone())),
+            Self::Remote(cur) => Ok(Self::Remote(cur.cur_clone().await?)),
+        }
+    }
+
     pub async fn first<Key, Value>(&mut self) -> Result<Option<(Key, Value)>>
     where
         Key: TableObject,
@@ -663,6 +670,25 @@ impl<K: TransactionKind> CursorAny<K> {
         }
     }
 
+    pub fn into_iter_cnt<'a, Key, Value>(
+        self,
+        cnt: u64,
+    ) -> Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        match self {
+            Self::Local(mut cur) => Box::pin(try_stream! {
+                for it in cur.iter::<Key, Value>() {
+                    let (k, v) = it?;
+                    yield (k, v);
+                }
+            }),
+            Self::Remote(cur) => cur.into_iter_cnt(cnt),
+        }
+    }
+
     pub fn iter_start<'a, Key, Value>(
         &'a mut self,
     ) -> Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>
@@ -673,6 +699,25 @@ impl<K: TransactionKind> CursorAny<K> {
         match self {
             Self::Local(cur) => Self::iter_to_stream(cur.iter_start::<Key, Value>()),
             Self::Remote(cur) => cur.iter_start(),
+        }
+    }
+
+    pub fn into_iter_start_cnt<'a, Key, Value>(
+        self,
+        cnt: u64,
+    ) -> Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        match self {
+            Self::Local(mut cur) => Box::pin(try_stream! {
+                for it in cur.iter_start::<Key, Value>() {
+                    let (k, v) = it?;
+                    yield (k, v);
+                }
+            }),
+            Self::Remote(cur) => cur.into_iter_start_cnt(cnt),
         }
     }
 
@@ -687,6 +732,26 @@ impl<K: TransactionKind> CursorAny<K> {
         Ok(match self {
             Self::Local(cur) => Self::iter_to_stream(cur.iter_from::<Key, Value>(&key)),
             Self::Remote(cur) => cur.iter_from(key.to_vec()).await?,
+        })
+    }
+
+    pub async fn into_iter_from_cnt<'a, Key, Value>(
+        self,
+        key: &'a [u8],
+        cnt: u64,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        Ok(match self {
+            Self::Local(mut cur) => Box::pin(try_stream! {
+                for it in cur.iter_from::<Key, Value>(&key) {
+                    let (k, v) = it?;
+                    yield (k, v);
+                }
+            }),
+            Self::Remote(cur) => cur.into_iter_from_cnt(key.to_vec(), cnt).await?,
         })
     }
 
@@ -709,6 +774,31 @@ impl<K: TransactionKind> CursorAny<K> {
         }
     }
 
+    pub fn into_iter_dup_cnt<'a, Key, Value>(
+        self,
+        cnt: u64,
+    ) -> Pin<
+        Box<
+            dyn Stream<Item = Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>>
+                + Send
+                + 'a,
+        >,
+    >
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        match self {
+            Self::Local(cur) => Box::pin(try_stream! {
+                for it in cur.into_iter_dup() {
+                    let st = Self::intoiter_to_stream(it);
+                    yield st;
+                }
+            }),
+            Self::Remote(cur) => cur.into_iter_dup_cnt(cnt),
+        }
+    }
+
     pub fn iter_dup_start<'a, Key, Value>(
         &'a mut self,
     ) -> Pin<
@@ -725,6 +815,31 @@ impl<K: TransactionKind> CursorAny<K> {
         match self {
             Self::Local(cur) => Self::iterdup_to_steam(cur.iter_dup_start()),
             Self::Remote(cur) => cur.iter_dup_start(),
+        }
+    }
+
+    pub fn into_iter_dup_start_cnt<'a, Key, Value>(
+        self,
+        cnt: u64,
+    ) -> Pin<
+        Box<
+            dyn Stream<Item = Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>>
+                + Send
+                + 'a,
+        >,
+    >
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        match self {
+            Self::Local(cur) => Box::pin(try_stream! {
+                for it in cur.into_iter_dup_start() {
+                    let st = Self::intoiter_to_stream(it);
+                    yield st;
+                }
+            }),
+            Self::Remote(cur) => cur.into_iter_dup_start_cnt(cnt),
         }
     }
 
@@ -753,6 +868,37 @@ impl<K: TransactionKind> CursorAny<K> {
         })
     }
 
+    pub async fn into_iter_dup_from_cnt<'a, Key, Value>(
+        self,
+        key: &'a [u8],
+        cnt: u64,
+    ) -> Result<
+        Pin<
+            Box<
+                dyn Stream<
+                        Item = Result<
+                            Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>,
+                        >,
+                    > + Send
+                    + 'a,
+            >,
+        >,
+    >
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        Ok(match self {
+            Self::Local(mut cur) => Box::pin(try_stream! {
+                for it in cur.into_iter_dup_from(&key) {
+                    let st = Self::intoiter_to_stream(it);
+                    yield st;
+                }
+            }),
+            Self::Remote(cur) => cur.into_iter_dup_from_cnt(key.to_vec(), cnt).await?,
+        })
+    }
+
     pub async fn iter_dup_of<'a, Key, Value>(
         &'a mut self,
         key: &[u8],
@@ -764,6 +910,26 @@ impl<K: TransactionKind> CursorAny<K> {
         Ok(match self {
             Self::Local(cur) => Self::iter_to_stream(cur.iter_dup_of(&key)),
             Self::Remote(cur) => cur.iter_dup_of(key.to_vec()).await?,
+        })
+    }
+
+    pub async fn into_iter_dup_of_cnt<'a, Key, Value>(
+        self,
+        key: &'a [u8],
+        cnt: u64,
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>
+    where
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    {
+        Ok(match self {
+            Self::Local(mut cur) => Box::pin(try_stream! {
+                for it in cur.into_iter_dup_of(&key) {
+                    let (k, v) = it?;
+                    yield (k, v);
+                }
+            }),
+            Self::Remote(cur) => cur.into_iter_dup_of_cnt(key.to_vec(), cnt).await?,
         })
     }
 }
