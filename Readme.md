@@ -117,7 +117,7 @@ The account is:
 Add this to your Cargo.toml:
 
 ```
-libmdbx-remote = "0.1"
+libmdbx-remote = "0.3"
 ```
 
 ### Batch RPC Calls
