@@ -61,6 +61,38 @@ fn context_deadline(duration: Duration) -> Context {
     ctx
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct BufferConfiguration {
+    pub max_count: u64,
+    pub max_buffer_bytes: u64,
+}
+
+impl Default for BufferConfiguration {
+    fn default() -> Self {
+        Self {
+            max_count: 8192,
+            max_buffer_bytes: 16 * 1024 * 1024,
+        }
+    }
+}
+
+impl BufferConfiguration {
+    pub fn new(count: u64, bytes: u64) -> Self {
+        Self {
+            max_count: count,
+            max_buffer_bytes: bytes,
+        }
+    }
+
+    pub fn max_count(self, count: u64) -> Self {
+        Self::new(count, self.max_buffer_bytes)
+    }
+
+    pub fn max_buffer_bytes(self, bytes: u64) -> Self {
+        Self::new(self.max_count, bytes)
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum ClientError {
     #[error("MDBX error: {0}")]
@@ -818,12 +850,16 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Ok(Some((found, k.unwrap(), v)))
     }
 
-    fn stream_iter_cnt<'a, Key: TableObject + Send + 'a, Value: TableObject + Send + 'a>(
+    fn stream_iter_buffered<'a, Key: TableObject + Send + 'a, Value: TableObject + Send + 'a>(
         inner: Arc<RemoteCursorInner<K>>,
         op: u32,
         next_op: u32,
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>> {
+        let BufferConfiguration {
+            max_count,
+            max_buffer_bytes,
+        } = buffer_config;
         let st = try_stream! {
             let cur = inner;
 
@@ -845,18 +881,16 @@ impl<K: TransactionKind> RemoteCursor<K> {
                 yield ret;
 
                 loop {
-                    let vals = cur.tx.env.cl.batch_cur_get_full(cur.tx.env.context(), cur.tx.env.handle, cur.tx.handle, cur.handle, cnt, next_op).await??;
+                    let vals = cur.tx.env.cl.batch_cur_get_full(cur.tx.env.context(), cur.tx.env.handle, cur.tx.handle, cur.handle, max_count, max_buffer_bytes, next_op).await??;
 
-                    let rt_size = vals.len() as u64;
+                    if vals.len() == 0 {
+                        break;
+                    }
                     for (k, v) in vals.into_iter() {
                         let k = Key::decode(&k)?;
                         let v = Value::decode(&v)?;
 
                         yield (k, v);
-                    }
-
-                    if rt_size < cnt || rt_size == 0 {
-                        break;
                     }
                 }
             }
@@ -866,10 +900,14 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Box::pin(st)
     }
 
-    fn stream_iter_dup_cnt<'a, Key: TableObject + Send + 'a, Value: TableObject + Send + 'a>(
+    fn stream_iter_dup_buffered<
+        'a,
+        Key: TableObject + Send + 'a,
+        Value: TableObject + Send + 'a,
+    >(
         inner: Arc<RemoteCursorInner<K>>,
         op: u32,
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Pin<
         Box<
             dyn Stream<Item = Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>>
@@ -886,7 +924,7 @@ impl<K: TransactionKind> RemoteCursor<K> {
                 let ret = match cur.tx.env.cl.cur_get(cur.tx.env.context(), cur.tx.env.handle, cur.tx.handle, cur.handle, None, None, op).await? {
                     Ok(_) => {
                         let new_cur = cur.cur_clone().await?;
-                        Ok(Self::stream_iter_cnt::<'a, Key, Value>(Arc::new(new_cur), MDBX_GET_CURRENT, MDBX_NEXT_DUP, cnt))
+                        Ok(Self::stream_iter_buffered::<'a, Key, Value>(Arc::new(new_cur), MDBX_GET_CURRENT, MDBX_NEXT_DUP, buffer_config))
                     },
                     Err(ServerError::MBDX(crate::Error::NoData | crate::Error::NotFound)) => break,
                     Err(e) => {
@@ -980,15 +1018,15 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Self::stream_iter(self.inner.clone(), MDBX_NEXT, MDBX_NEXT)
     }
 
-    pub fn into_iter_cnt<'a, Key, Value>(
+    pub fn into_iter_buffered<'a, Key, Value>(
         self,
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>
     where
         Key: TableObject + Send + 'a,
         Value: TableObject + Send + 'a,
     {
-        Self::stream_iter_cnt(self.inner.clone(), MDBX_NEXT, MDBX_NEXT, cnt)
+        Self::stream_iter_buffered(self.inner.clone(), MDBX_NEXT, MDBX_NEXT, buffer_config)
     }
 
     pub fn iter_start<'a, Key, Value>(
@@ -1001,15 +1039,15 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Self::stream_iter(self.inner.clone(), MDBX_FIRST, MDBX_NEXT)
     }
 
-    pub fn into_iter_start_cnt<'a, Key, Value>(
+    pub fn into_iter_start_buffered<'a, Key, Value>(
         self,
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>
     where
         Key: TableObject + Send + 'a,
         Value: TableObject + Send + 'a,
     {
-        Self::stream_iter_cnt(self.inner.clone(), MDBX_FIRST, MDBX_NEXT, cnt)
+        Self::stream_iter_buffered(self.inner.clone(), MDBX_FIRST, MDBX_NEXT, buffer_config)
     }
 
     pub async fn iter_from<'a, Key, Value>(
@@ -1029,10 +1067,10 @@ impl<K: TransactionKind> RemoteCursor<K> {
         ))
     }
 
-    pub async fn into_iter_from_cnt<'a, Key, Value>(
+    pub async fn into_iter_from_buffered<'a, Key, Value>(
         mut self,
         key: Vec<u8>,
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>
     where
         Key: TableObject + Send + 'a,
@@ -1040,11 +1078,11 @@ impl<K: TransactionKind> RemoteCursor<K> {
     {
         let _ = self.set_range::<(), ()>(key).await?;
 
-        Ok(Self::stream_iter_cnt(
+        Ok(Self::stream_iter_buffered(
             self.inner.clone(),
             MDBX_GET_CURRENT,
             MDBX_NEXT,
-            cnt,
+            buffer_config,
         ))
     }
 
@@ -1064,9 +1102,9 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Self::stream_iter_dup(self.inner.clone(), MDBX_NEXT)
     }
 
-    pub fn into_iter_dup_cnt<'a, Key, Value>(
+    pub fn into_iter_dup_buffered<'a, Key, Value>(
         self,
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Pin<
         Box<
             dyn Stream<Item = Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>>
@@ -1078,7 +1116,7 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Key: TableObject + Send + 'a,
         Value: TableObject + Send + 'a,
     {
-        Self::stream_iter_dup_cnt(self.inner.clone(), MDBX_NEXT, cnt)
+        Self::stream_iter_dup_buffered(self.inner.clone(), MDBX_NEXT, buffer_config)
     }
 
     pub fn iter_dup_start<'a, Key, Value>(
@@ -1097,9 +1135,9 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Self::stream_iter_dup(self.inner.clone(), MDBX_FIRST)
     }
 
-    pub fn into_iter_dup_start_cnt<'a, Key, Value>(
+    pub fn into_iter_dup_start_buffered<'a, Key, Value>(
         self,
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Pin<
         Box<
             dyn Stream<Item = Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>>
@@ -1111,7 +1149,7 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Key: TableObject + Send + 'a,
         Value: TableObject + Send + 'a,
     {
-        Self::stream_iter_dup_cnt(self.inner.clone(), MDBX_FIRST, cnt)
+        Self::stream_iter_dup_buffered(self.inner.clone(), MDBX_FIRST, buffer_config)
     }
 
     pub async fn iter_dup_from<'a, Key, Value>(
@@ -1137,10 +1175,10 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Ok(Self::stream_iter_dup(self.inner.clone(), MDBX_GET_CURRENT))
     }
 
-    pub async fn into_iter_dup_from_cnt<'a, Key, Value>(
+    pub async fn into_iter_dup_from_buffered<'a, Key, Value>(
         mut self,
         key: Vec<u8>,
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Result<
         Pin<
             Box<
@@ -1158,10 +1196,10 @@ impl<K: TransactionKind> RemoteCursor<K> {
         Value: TableObject + Send + 'a,
     {
         let _ = self.set_range::<(), ()>(key).await?;
-        Ok(Self::stream_iter_dup_cnt(
+        Ok(Self::stream_iter_dup_buffered(
             self.inner.clone(),
             MDBX_GET_CURRENT,
-            cnt,
+            buffer_config,
         ))
     }
 
@@ -1186,10 +1224,10 @@ impl<K: TransactionKind> RemoteCursor<K> {
         }
     }
 
-    pub async fn into_iter_dup_of_cnt<'a, Key, Value>(
+    pub async fn into_iter_dup_of_buffered<'a, Key, Value>(
         mut self,
         key: Vec<u8>,
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>
     where
         Key: TableObject + Send + 'a,
@@ -1204,11 +1242,11 @@ impl<K: TransactionKind> RemoteCursor<K> {
             ))
         } else {
             let _ = self.last::<(), ()>().await?;
-            Ok(Self::stream_iter_cnt(
+            Ok(Self::stream_iter_buffered(
                 self.inner.clone(),
                 MDBX_NEXT,
                 MDBX_NEXT,
-                cnt,
+                buffer_config,
             ))
         }
     }

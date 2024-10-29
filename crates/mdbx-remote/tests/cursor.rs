@@ -1,5 +1,5 @@
 #![allow(missing_docs)]
-use std::borrow::Cow;
+use std::{borrow::Cow, u64};
 
 use any::{local_env, remote_env};
 use futures_util::StreamExt;
@@ -27,6 +27,14 @@ macro_rules! local_remote {
             }
         }
     };
+}
+
+fn min_config() -> BufferConfiguration {
+    BufferConfiguration::new(1, 1)
+}
+
+fn max_config() -> BufferConfiguration {
+    BufferConfiguration::new(256, u64::MAX)
 }
 
 async fn test_get(env: EnvironmentAny) {
@@ -227,7 +235,7 @@ async fn test_iter(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_cnt(64)
+            .into_iter_buffered(max_config())
             .map(|t| t.unwrap())
             .collect::<Vec<_>>()
             .await
@@ -239,7 +247,7 @@ async fn test_iter(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_cnt(1)
+            .into_iter_buffered(min_config())
             .map(|t| t.unwrap())
             .collect::<Vec<_>>()
             .await
@@ -257,7 +265,7 @@ async fn test_iter(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_start_cnt(1)
+            .into_iter_start_buffered(min_config())
             .map(|t| t.unwrap())
             .collect::<Vec<_>>()
             .await
@@ -269,7 +277,7 @@ async fn test_iter(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_start_cnt(64)
+            .into_iter_start_buffered(max_config())
             .map(|t| t.unwrap())
             .collect::<Vec<_>>()
             .await
@@ -291,7 +299,7 @@ async fn test_iter(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_from_cnt(b"key2", 1)
+            .into_iter_from_buffered(b"key2", min_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -305,7 +313,7 @@ async fn test_iter(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_from_cnt(b"key2", 64)
+            .into_iter_from_buffered(b"key2", max_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -331,7 +339,7 @@ async fn test_iter(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_from_cnt(b"key4", 64)
+            .into_iter_from_buffered(b"key4", max_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -345,7 +353,7 @@ async fn test_iter(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_from_cnt(b"key4", 1)
+            .into_iter_from_buffered(b"key4", min_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -371,7 +379,7 @@ async fn test_iter(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_from_cnt(b"key6", 1)
+            .into_iter_from_buffered(b"key6", min_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -385,7 +393,7 @@ async fn test_iter(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_from_cnt(b"key6", 64)
+            .into_iter_from_buffered(b"key6", max_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -425,7 +433,7 @@ async fn test_iter_empty_database(env: EnvironmentAny) {
         .cursor_clone()
         .await
         .unwrap()
-        .into_iter_cnt::<(), ()>(64)
+        .into_iter_buffered::<(), ()>(max_config())
         .next()
         .await
         .is_none());
@@ -434,7 +442,7 @@ async fn test_iter_empty_database(env: EnvironmentAny) {
         .cursor_clone()
         .await
         .unwrap()
-        .into_iter_start_cnt::<(), ()>(64)
+        .into_iter_start_buffered::<(), ()>(max_config())
         .next()
         .await
         .is_none());
@@ -443,7 +451,7 @@ async fn test_iter_empty_database(env: EnvironmentAny) {
         .cursor_clone()
         .await
         .unwrap()
-        .into_iter_from_cnt::<(), ()>(b"foo", 64)
+        .into_iter_from_buffered::<(), ()>(b"foo", max_config())
         .await
         .unwrap()
         .next()
@@ -471,7 +479,7 @@ async fn test_iter_empty_dup_database(env: EnvironmentAny) {
         .cursor_clone()
         .await
         .unwrap()
-        .into_iter_cnt::<(), ()>(64)
+        .into_iter_buffered::<(), ()>(max_config())
         .next()
         .await
         .is_none());
@@ -480,7 +488,7 @@ async fn test_iter_empty_dup_database(env: EnvironmentAny) {
         .cursor_clone()
         .await
         .unwrap()
-        .into_iter_start_cnt::<(), ()>(64)
+        .into_iter_start_buffered::<(), ()>(max_config())
         .next()
         .await
         .is_none());
@@ -489,7 +497,7 @@ async fn test_iter_empty_dup_database(env: EnvironmentAny) {
         .cursor_clone()
         .await
         .unwrap()
-        .into_iter_from_cnt::<(), ()>(b"foo", 64)
+        .into_iter_from_buffered::<(), ()>(b"foo", max_config())
         .await
         .unwrap()
         .next()
@@ -514,7 +522,7 @@ async fn test_iter_empty_dup_database(env: EnvironmentAny) {
         .cursor_clone()
         .await
         .unwrap()
-        .into_iter_dup_cnt::<(), ()>(64)
+        .into_iter_dup_buffered::<(), ()>(max_config())
         .map(|t| t.unwrap())
         .flatten()
         .next()
@@ -531,7 +539,7 @@ async fn test_iter_empty_dup_database(env: EnvironmentAny) {
         .cursor_clone()
         .await
         .unwrap()
-        .into_iter_dup_start_cnt::<(), ()>(64)
+        .into_iter_dup_start_buffered::<(), ()>(max_config())
         .map(|t| t.unwrap())
         .flatten()
         .next()
@@ -548,7 +556,7 @@ async fn test_iter_empty_dup_database(env: EnvironmentAny) {
         .cursor_clone()
         .await
         .unwrap()
-        .into_iter_dup_from_cnt::<(), ()>(b"foo", 64)
+        .into_iter_dup_from_buffered::<(), ()>(b"foo", max_config())
         .await
         .unwrap()
         .map(|t| t.unwrap())
@@ -569,7 +577,7 @@ async fn test_iter_empty_dup_database(env: EnvironmentAny) {
         .cursor_clone()
         .await
         .unwrap()
-        .into_iter_dup_of_cnt::<(), ()>(b"foo", 64)
+        .into_iter_dup_of_buffered::<(), ()>(b"foo", max_config())
         .await
         .unwrap()
         .next()
@@ -631,7 +639,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_cnt(1)
+            .into_iter_dup_buffered(min_config())
             .map(|t| t.unwrap())
             .flatten()
             .map(|t| t.unwrap())
@@ -644,7 +652,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_cnt(64)
+            .into_iter_dup_buffered(max_config())
             .map(|t| t.unwrap())
             .flatten()
             .map(|t| t.unwrap())
@@ -671,7 +679,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_cnt(1)
+            .into_iter_dup_buffered(min_config())
             .map(|t| t.unwrap())
             .flatten()
             .map(|t| t.unwrap())
@@ -684,7 +692,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_cnt(64)
+            .into_iter_dup_buffered(max_config())
             .map(|t| t.unwrap())
             .flatten()
             .map(|t| t.unwrap())
@@ -710,7 +718,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_start_cnt(1)
+            .into_iter_dup_start_buffered(min_config())
             .map(|t| t.unwrap())
             .flatten()
             .map(|t| t.unwrap())
@@ -723,7 +731,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_start_cnt(64)
+            .into_iter_dup_start_buffered(max_config())
             .map(|t| t.unwrap())
             .flatten()
             .map(|t| t.unwrap())
@@ -749,7 +757,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_from_cnt(b"b", 1)
+            .into_iter_dup_from_buffered(b"b", min_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -764,7 +772,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_from_cnt(b"b", 64)
+            .into_iter_dup_from_buffered(b"b", max_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -794,7 +802,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_from_cnt(b"ab", 1)
+            .into_iter_dup_from_buffered(b"ab", min_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -810,7 +818,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_from_cnt(b"ab", 64)
+            .into_iter_dup_from_buffered(b"ab", max_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -840,7 +848,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_from_cnt(b"d", 64)
+            .into_iter_dup_from_buffered(b"d", max_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -856,7 +864,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_from_cnt(b"d", 1)
+            .into_iter_dup_from_buffered(b"d", min_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -886,7 +894,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_from_cnt(b"f", 1)
+            .into_iter_dup_from_buffered(b"f", min_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -902,7 +910,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_from_cnt(b"f", 64)
+            .into_iter_dup_from_buffered(b"f", max_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -932,7 +940,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_of_cnt(b"b", 1)
+            .into_iter_dup_of_buffered(b"b", min_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -946,7 +954,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_of_cnt(b"b", 64)
+            .into_iter_dup_of_buffered(b"b", max_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -972,7 +980,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_of_cnt::<(), ()>(b"foo", 1)
+            .into_iter_dup_of_buffered::<(), ()>(b"foo", min_config())
             .await
             .unwrap()
             .count()
@@ -985,7 +993,7 @@ async fn test_iter_dup(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_of_cnt::<(), ()>(b"foo", 64)
+            .into_iter_dup_of_buffered::<(), ()>(b"foo", max_config())
             .await
             .unwrap()
             .count()
@@ -1044,7 +1052,7 @@ async fn test_iter_del_get(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_cnt(1)
+            .into_iter_dup_buffered(min_config())
             .map(|t| t.unwrap())
             .flatten()
             .map(|t| t.unwrap())
@@ -1058,7 +1066,7 @@ async fn test_iter_del_get(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_cnt(64)
+            .into_iter_dup_buffered(max_config())
             .map(|t| t.unwrap())
             .flatten()
             .map(|t| t.unwrap())
@@ -1084,7 +1092,7 @@ async fn test_iter_del_get(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_of_cnt(b"a", 1)
+            .into_iter_dup_of_buffered(b"a", min_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -1097,7 +1105,7 @@ async fn test_iter_del_get(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_of_cnt(b"a", 64)
+            .into_iter_dup_of_buffered(b"a", max_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -1126,7 +1134,7 @@ async fn test_iter_del_get(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_of_cnt::<(), ()>(b"a", 1)
+            .into_iter_dup_of_buffered::<(), ()>(b"a", min_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())
@@ -1141,7 +1149,7 @@ async fn test_iter_del_get(env: EnvironmentAny) {
             .cursor_clone()
             .await
             .unwrap()
-            .into_iter_dup_of_cnt::<(), ()>(b"a", 64)
+            .into_iter_dup_of_buffered::<(), ()>(b"a", max_config())
             .await
             .unwrap()
             .map(|t| t.unwrap())

@@ -9,7 +9,10 @@ use async_stream::try_stream;
 use tokio_stream::Stream;
 
 use crate::{
-    remote::{ClientError, RemoteCursor, RemoteDatabase, RemoteEnvironment, RemoteTransaction},
+    remote::{
+        BufferConfiguration, ClientError, RemoteCursor, RemoteDatabase, RemoteEnvironment,
+        RemoteTransaction,
+    },
     service::RemoteMDBXClient,
     CommitLatency, Cursor, Database, DatabaseFlags, Environment, EnvironmentBuilder,
     EnvironmentFlags, EnvironmentKind, Info, Mode, Stat, TableObject, Transaction, TransactionKind,
@@ -670,9 +673,9 @@ impl<K: TransactionKind> CursorAny<K> {
         }
     }
 
-    pub fn into_iter_cnt<'a, Key, Value>(
+    pub fn into_iter_buffered<'a, Key, Value>(
         self,
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>
     where
         Key: TableObject + Send + 'a,
@@ -685,7 +688,7 @@ impl<K: TransactionKind> CursorAny<K> {
                     yield (k, v);
                 }
             }),
-            Self::Remote(cur) => cur.into_iter_cnt(cnt),
+            Self::Remote(cur) => cur.into_iter_buffered(buffer_config),
         }
     }
 
@@ -702,9 +705,9 @@ impl<K: TransactionKind> CursorAny<K> {
         }
     }
 
-    pub fn into_iter_start_cnt<'a, Key, Value>(
+    pub fn into_iter_start_buffered<'a, Key, Value>(
         self,
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>
     where
         Key: TableObject + Send + 'a,
@@ -717,7 +720,7 @@ impl<K: TransactionKind> CursorAny<K> {
                     yield (k, v);
                 }
             }),
-            Self::Remote(cur) => cur.into_iter_start_cnt(cnt),
+            Self::Remote(cur) => cur.into_iter_start_buffered(buffer_config),
         }
     }
 
@@ -735,10 +738,10 @@ impl<K: TransactionKind> CursorAny<K> {
         })
     }
 
-    pub async fn into_iter_from_cnt<'a, Key, Value>(
+    pub async fn into_iter_from_buffered<'a, Key, Value>(
         self,
         key: &'a [u8],
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>
     where
         Key: TableObject + Send + 'a,
@@ -751,7 +754,10 @@ impl<K: TransactionKind> CursorAny<K> {
                     yield (k, v);
                 }
             }),
-            Self::Remote(cur) => cur.into_iter_from_cnt(key.to_vec(), cnt).await?,
+            Self::Remote(cur) => {
+                cur.into_iter_from_buffered(key.to_vec(), buffer_config)
+                    .await?
+            }
         })
     }
 
@@ -774,9 +780,9 @@ impl<K: TransactionKind> CursorAny<K> {
         }
     }
 
-    pub fn into_iter_dup_cnt<'a, Key, Value>(
+    pub fn into_iter_dup_buffered<'a, Key, Value>(
         self,
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Pin<
         Box<
             dyn Stream<Item = Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>>
@@ -795,7 +801,7 @@ impl<K: TransactionKind> CursorAny<K> {
                     yield st;
                 }
             }),
-            Self::Remote(cur) => cur.into_iter_dup_cnt(cnt),
+            Self::Remote(cur) => cur.into_iter_dup_buffered(buffer_config),
         }
     }
 
@@ -818,9 +824,9 @@ impl<K: TransactionKind> CursorAny<K> {
         }
     }
 
-    pub fn into_iter_dup_start_cnt<'a, Key, Value>(
+    pub fn into_iter_dup_start_buffered<'a, Key, Value>(
         self,
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Pin<
         Box<
             dyn Stream<Item = Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>>
@@ -839,7 +845,7 @@ impl<K: TransactionKind> CursorAny<K> {
                     yield st;
                 }
             }),
-            Self::Remote(cur) => cur.into_iter_dup_start_cnt(cnt),
+            Self::Remote(cur) => cur.into_iter_dup_start_buffered(buffer_config),
         }
     }
 
@@ -868,10 +874,10 @@ impl<K: TransactionKind> CursorAny<K> {
         })
     }
 
-    pub async fn into_iter_dup_from_cnt<'a, Key, Value>(
+    pub async fn into_iter_dup_from_buffered<'a, Key, Value>(
         self,
         key: &'a [u8],
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Result<
         Pin<
             Box<
@@ -895,7 +901,10 @@ impl<K: TransactionKind> CursorAny<K> {
                     yield st;
                 }
             }),
-            Self::Remote(cur) => cur.into_iter_dup_from_cnt(key.to_vec(), cnt).await?,
+            Self::Remote(cur) => {
+                cur.into_iter_dup_from_buffered(key.to_vec(), buffer_config)
+                    .await?
+            }
         })
     }
 
@@ -913,10 +922,10 @@ impl<K: TransactionKind> CursorAny<K> {
         })
     }
 
-    pub async fn into_iter_dup_of_cnt<'a, Key, Value>(
+    pub async fn into_iter_dup_of_buffered<'a, Key, Value>(
         self,
         key: &'a [u8],
-        cnt: u64,
+        buffer_config: BufferConfiguration,
     ) -> Result<Pin<Box<dyn Stream<Item = Result<(Key, Value)>> + Send + 'a>>>
     where
         Key: TableObject + Send + 'a,
@@ -929,7 +938,10 @@ impl<K: TransactionKind> CursorAny<K> {
                     yield (k, v);
                 }
             }),
-            Self::Remote(cur) => cur.into_iter_dup_of_cnt(key.to_vec(), cnt).await?,
+            Self::Remote(cur) => {
+                cur.into_iter_dup_of_buffered(key.to_vec(), buffer_config)
+                    .await?
+            }
         })
     }
 }

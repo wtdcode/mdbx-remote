@@ -23,7 +23,10 @@ pub use crate::{
     },
     error::{Error, Result},
     flags::*,
-    remote::{ClientError, RemoteCursor, RemoteDatabase, RemoteEnvironment, RemoteTransaction},
+    remote::{
+        BufferConfiguration, ClientError, RemoteCursor, RemoteDatabase, RemoteEnvironment,
+        RemoteTransaction,
+    },
     service::{MDBXServerState, RemoteMDBX, RemoteMDBXClient, RemoteMDBXServer, ServerError},
     transaction::{CommitLatency, Transaction, TransactionKind, RO, RW},
 };

@@ -102,6 +102,7 @@ pub trait RemoteMDBX {
         tx: u64,
         cur: u64,
         cnt: u64,
+        buffer: u64,
         op: u32,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, ServerError>;
 }
@@ -838,6 +839,7 @@ impl RemoteMDBX for RemoteMDBXServer {
         tx: u64,
         cur: u64,
         cnt: u64,
+        buffer: u64,
         op: u32,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, ServerError> {
         let op = mdbx_remote_sys::MDBX_cursor_op::try_from(op)
@@ -846,7 +848,7 @@ impl RemoteMDBX for RemoteMDBXServer {
         if !ALLOWED_GET_FULL_OPS.contains(&op) {
             return Err(ServerError::INVALIDGETULL(op));
         }
-        let lg: tokio::sync::RwLockReadGuard<'_, MDBXServerState> = self.state.read().await;
+        let lg = self.state.read().await;
 
         let env = lg.envs.get(&env).ok_or(ServerError::NOENV)?;
 
@@ -854,10 +856,10 @@ impl RemoteMDBX for RemoteMDBXServer {
         if let Some(tx) = env.rwtxs.get(&tx) {
             let cur = tx.cursors.get(&cur).ok_or(ServerError::NOCURSOR)?;
 
-            return Self::batch_cur_get_full_impl(cur, cnt, op);
+            return Self::batch_cur_get_full_impl(cur, cnt, buffer, op);
         } else if let Some(tx) = env.rotxs.get(&tx) {
             let cur = tx.cursors.get(&cur).ok_or(ServerError::NOCURSOR)?;
-            return Self::batch_cur_get_full_impl(cur, cnt, op);
+            return Self::batch_cur_get_full_impl(cur, cnt, buffer, op);
         } else {
             return Err(ServerError::NOTX);
         }
@@ -868,13 +870,20 @@ impl RemoteMDBXServer {
     fn batch_cur_get_full_impl<K: TransactionKind>(
         cur: &Cursor<K>,
         cnt: u64,
+        buffer: u64,
         op: u32,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, ServerError> {
         let mut out = Vec::with_capacity(cnt as usize);
+        let mut current_size = 0;
         for _ in 0..cnt {
+            if current_size >= buffer {
+                break;
+            }
+
             match cur.get::<Vec<u8>, Vec<u8>>(None, None, op) {
                 Ok((k, v, _)) => {
                     let key = k.ok_or(ServerError::INVALIDGETULL(op))?;
+                    current_size += key.len() as u64 + v.len() as u64;
                     out.push((key, v));
                 }
                 Err(crate::Error::NoData | crate::Error::NotFound) => return Ok(out),

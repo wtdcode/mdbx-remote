@@ -1,12 +1,12 @@
 use clap::Args;
 
 use color_eyre::Result;
-use libmdbx_remote::{DatabaseFlags, EnvironmentAny, TransactionAny, RO, RW};
+use libmdbx_remote::{BufferConfiguration, EnvironmentAny};
 use tokio_stream::StreamExt;
 
 #[derive(Args)]
 pub struct DumpArguments {
-    #[arg(short, long)]
+    #[arg(index = 1)]
     pub input: String,
 
     #[arg(short, long, default_value_t = 128)]
@@ -27,10 +27,20 @@ pub async fn mdbx_dump(args: DumpArguments) -> Result<()> {
     while let Some(it) = st.next().await {
         let (k, _) = it?;
         let table = String::from_utf8(k)?;
+
+        if let Some(request) = &args.table {
+            if request != &table {
+                continue;
+            }
+        }
+
+        println!("Dumping table {}\n===============\n", &table);
         let table = src_tx.open_db(Some(table.as_str())).await?;
         let table_cur = src_tx.cursor(&table).await?;
 
-        let mut st2 = table_cur.into_iter_cnt::<Vec<u8>, Vec<u8>>(args.batch);
+        let mut st2 = table_cur.into_iter_buffered::<Vec<u8>, Vec<u8>>(
+            BufferConfiguration::default().max_count(args.batch),
+        );
         while let Some(it2) = st2.next().await {
             let (k, v) = it2?;
 
