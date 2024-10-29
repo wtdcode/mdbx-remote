@@ -120,6 +120,14 @@ Add this to your Cargo.toml:
 libmdbx-remote = "0.1"
 ```
 
+### Batch RPC Calls
+
+You certainly want to make 1 RPC call per data fetching, which wastes your bandwith and is super slow.
+
+`mdbx-remote` provides buffered cursor operations for high performance data accessing.
+
+Check the methods with `_buffered` suffix for details.
+
 ## Caveats
 
 - Only expose the RPC endpoint to trusted network because it doesn't have any protection or authentication. Tunnel the traffic via something like SSH if you really would like to expose it to public network.
