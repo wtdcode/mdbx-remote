@@ -122,7 +122,7 @@ libmdbx-remote = "0.3"
 
 ### Batch RPC Calls
 
-You certainly want to make 1 RPC call per data fetching, which wastes your bandwith and is super slow.
+You certainly don't want to make 1 RPC call per data fetching, which wastes your bandwith and is super slow.
 
 `mdbx-remote` provides buffered cursor operations for high performance data accessing.
 
