@@ -873,7 +873,7 @@ impl RemoteMDBXServer {
         buffer: u64,
         op: u32,
     ) -> Result<Vec<(Vec<u8>, Vec<u8>)>, ServerError> {
-        let mut out = Vec::with_capacity(cnt as usize);
+        let mut out = Vec::new();
         let mut current_size = 0;
         for _ in 0..cnt {
             if current_size >= buffer {

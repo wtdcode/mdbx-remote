@@ -3,6 +3,7 @@ use std::{
     path::{Path, PathBuf},
     pin::Pin,
     time::Duration,
+    usize,
 };
 
 use async_stream::try_stream;
@@ -40,11 +41,14 @@ impl EnvironmentAny {
         remote: String,
         deadline: Duration,
     ) -> Result<Self> {
-        let transport = tarpc::serde_transport::tcp::connect(
+        let mut transport = tarpc::serde_transport::tcp::connect(
             remote,
             tarpc::tokio_serde::formats::Bincode::default,
-        )
-        .await?;
+        );
+
+        transport.config_mut().max_frame_length(usize::MAX);
+
+        let transport = transport.await?;
         let client = RemoteMDBXClient::new(tarpc::client::Config::default(), transport);
         let env =
             RemoteEnvironment::open_with_builder(path.to_path_buf(), builder, client, deadline)
