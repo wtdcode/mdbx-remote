@@ -302,18 +302,16 @@ impl<K: TransactionKind> TransactionAny<K> {
             Self::Remote(tx) => Ok(tx.db_stat_with_dbi(dbi).await?),
         }
     }
-}
 
-impl TransactionAny<RO> {
-    pub async fn cursor(&self, db: &DatabaseAny) -> Result<CursorAny<RO>> {
-        self.cursor_with_dbi(db.dbi()).await
-    }
-
-    pub async fn cursor_with_dbi(&self, dbi: u32) -> Result<CursorAny<RO>> {
+    pub async fn cursor_with_dbi(&self, dbi: u32) -> Result<CursorAny<K>> {
         match self {
             Self::Local(tx) => Ok(CursorAny::Local(tx.cursor_with_dbi(dbi)?)),
             Self::Remote(tx) => Ok(CursorAny::Remote(tx.cursor(dbi).await?)),
         }
+    }
+
+    pub async fn cursor(&self, db: &DatabaseAny) -> Result<CursorAny<K>> {
+        self.cursor_with_dbi(db.dbi()).await
     }
 }
 
@@ -364,16 +362,6 @@ impl TransactionAny<RW> {
         }
     }
 
-    pub async fn cursor(&self, db: &DatabaseAny) -> Result<CursorAny<RW>> {
-        self.cursor_with_dbi(db.dbi()).await
-    }
-
-    pub async fn cursor_with_dbi(&self, dbi: u32) -> Result<CursorAny<RW>> {
-        match self {
-            Self::Local(tx) => Ok(CursorAny::Local(tx.cursor_with_dbi(dbi)?)),
-            Self::Remote(tx) => Ok(CursorAny::Remote(tx.cursor(dbi).await?)),
-        }
-    }
     pub async fn commit(self) -> Result<(bool, CommitLatency)> {
         match self {
             Self::Local(tx) => Ok(tokio::task::spawn_blocking(move || tx.commit()).await??),

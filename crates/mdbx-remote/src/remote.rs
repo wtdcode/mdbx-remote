@@ -435,21 +435,31 @@ impl<K: TransactionKind> RemoteTransaction<K> {
 
         v.map(|t| V::decode(&t)).transpose().map_err(|e| e.into())
     }
-}
 
-impl RemoteTransaction<RO> {
-    pub async fn cursor(&self, dbi: u32) -> Result<RemoteCursor<RO>> {
-        let cur = self
-            .inner
-            .env
-            .cl
-            .tx_ro_cursor(
-                self.inner.env.context(),
-                self.inner.env.handle,
-                self.inner.handle,
-                dbi,
-            )
-            .await??;
+    pub async fn cursor(&self, dbi: u32) -> Result<RemoteCursor<K>> {
+        let cur = if K::IS_READ_ONLY {
+            self.inner
+                .env
+                .cl
+                .tx_ro_cursor(
+                    self.inner.env.context(),
+                    self.inner.env.handle,
+                    self.inner.handle,
+                    dbi,
+                )
+                .await??
+        } else {
+            self.inner
+                .env
+                .cl
+                .tx_rw_cursor(
+                    self.inner.env.context(),
+                    self.inner.env.handle,
+                    self.inner.handle,
+                    dbi,
+                )
+                .await??
+        };
 
         Ok(RemoteCursor {
             inner: Arc::new(RemoteCursorInner {
@@ -537,27 +547,6 @@ impl RemoteTransaction<RW> {
     ) -> Result<RemoteDatabase> {
         self.open_db_with_flags(db, flags | DatabaseFlags::CREATE)
             .await
-    }
-
-    pub async fn cursor(&self, dbi: u32) -> Result<RemoteCursor<RW>> {
-        let cur = self
-            .inner
-            .env
-            .cl
-            .tx_rw_cursor(
-                self.inner.env.context(),
-                self.inner.env.handle,
-                self.inner.handle,
-                dbi,
-            )
-            .await??;
-
-        Ok(RemoteCursor {
-            inner: Arc::new(RemoteCursorInner {
-                tx: self.inner.clone(),
-                handle: cur,
-            }),
-        })
     }
 
     pub async fn commit(self) -> Result<(bool, CommitLatency)> {
