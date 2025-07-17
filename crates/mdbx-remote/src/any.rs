@@ -57,6 +57,14 @@ impl EnvironmentAny {
     }
 
     pub async fn open_with_defaults(url: &str, defaults: EnvironmentBuilder) -> Result<Self> {
+        if url.starts_with("mdbx") || url.starts_with("file") {
+            Self::open_url_with_defaults(url, defaults).await
+        } else {
+            Self::open_local(&PathBuf::from(url), defaults)
+        }
+    }
+
+    pub async fn open_url_with_defaults(url: &str, defaults: EnvironmentBuilder) -> Result<Self> {
         let url = url::Url::parse(url).map_err(|e| ClientError::WrongURL(e))?;
         let mut builder = defaults;
 

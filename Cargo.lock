@@ -2555,7 +2555,7 @@ checksum = "f9fbbcab51052fe104eb5e5d351cf728d30a5be1fe14d9be8a3b097481fb97de"
 
 [[package]]
 name = "libmdbx-remote"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "async-stream",
  "bitflags 2.9.1",
@@ -2666,7 +2666,7 @@ dependencies = [
 
 [[package]]
 name = "mdbx-remote-sys"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "bindgen",
  "cc",
