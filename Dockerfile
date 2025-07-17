@@ -5,7 +5,7 @@ WORKDIR /work
 COPY ./crates /work/crates
 COPY ./benches /work/benches
 COPY ./Cargo.toml /work/Cargo.toml
-COPY ./Cargo.lock /work/Cargo.lock
+# COPY ./Cargo.lock /work/Cargo.lock
 
 RUN apt update && apt install libclang-dev -y
 
