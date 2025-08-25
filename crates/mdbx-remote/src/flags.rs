@@ -201,7 +201,7 @@ impl EnvironmentFlags {
 
 bitflags! {
     #[doc="Database options."]
-    #[derive(Default)]
+    #[derive(Default, Clone, Copy)]
     pub struct DatabaseFlags: MDBX_env_flags_t {
         const REVERSE_KEY = MDBX_REVERSEKEY;
         const DUP_SORT = MDBX_DUPSORT;
@@ -216,7 +216,7 @@ bitflags! {
 
 bitflags! {
     #[doc="Write options."]
-    #[derive(Default)]
+    #[derive(Default, Clone, Copy)]
     pub struct WriteFlags: MDBX_env_flags_t {
         const UPSERT = MDBX_UPSERT;
         const NO_OVERWRITE = MDBX_NOOVERWRITE;
