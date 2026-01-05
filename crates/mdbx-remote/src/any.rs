@@ -185,6 +185,20 @@ impl EnvironmentAny {
         Self::open_with_defaults(url, defaults).await
     }
 
+    pub fn as_local(&self) -> Option<&Environment> {
+        match self {
+            Self::Local(env) => Some(env),
+            Self::Remote(_) => None,
+        }
+    }
+
+    pub fn as_remote(&self) -> Option<&RemoteEnvironment> {
+        match self {
+            Self::Remote(env) => Some(env),
+            Self::Local(_) => None,
+        }
+    }
+
     pub async fn begin_ro_txn(&self) -> Result<TransactionAny<RO>> {
         match self {
             Self::Local(env) => {
