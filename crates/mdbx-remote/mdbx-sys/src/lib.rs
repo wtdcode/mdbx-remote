@@ -12,6 +12,6 @@
     non_snake_case,
     clippy::all
 )]
-#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 use serde::{Deserialize, Serialize};
 include!(concat!(env!("OUT_DIR"), "/bindings.rs"));

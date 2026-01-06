@@ -144,4 +144,4 @@ Check the methods with `_buffered` suffix for details.
 
 ## Credits
 
-The bindings is forked from reth v1.1.0.
+The bindings is forked from reth v1.9.3.
