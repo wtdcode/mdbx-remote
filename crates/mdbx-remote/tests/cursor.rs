@@ -1198,18 +1198,13 @@ async fn test_put_del(env: EnvironmentAny) {
         )
     );
 
+    // MDBX 0.13 behavior change
     cursor.del(WriteFlags::empty()).await.unwrap();
     assert_eq!(
         cursor.get_current::<Vec<u8>, Vec<u8>>().await.unwrap(),
-        None
+        Some((b"key2".to_vec(), b"val2".to_vec()))
     );
-    assert_eq!(
-        cursor.last().await.unwrap().unwrap(),
-        (
-            Cow::Borrowed(b"key2" as &[u8]),
-            Cow::Borrowed(b"val2" as &[u8])
-        )
-    );
+    assert_eq!(cursor.next::<Vec<u8>, Vec<u8>>().await.unwrap(), None);
 }
 
 local_remote!(test_get);
